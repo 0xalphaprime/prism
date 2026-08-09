@@ -1,7 +1,13 @@
-# Prism
+<p align="center">
+  <img src="public/prism-mark.png" alt="Prism" width="112" height="112" />
+</p>
 
-**Only variety can absorb variety.**  
-— W. Ross Ashby
+<h1 align="center">Prism</h1>
+
+<p align="center">
+  <strong>Only variety can absorb variety.</strong><br />
+  — W. Ross Ashby
+</p>
 
 A no-code **mixture-of-agents (MoA) laboratory**: compose multi-agent workflows as a living graph — context in upstream, specialists and models on each branch, step or run the system, inspect every bifurcation’s artifacts and metrics.
 
