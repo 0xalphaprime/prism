@@ -17,6 +17,9 @@ export const metadata: Metadata = {
   title: "Prism — agent graph sandbox",
   description:
     "A no-code sandbox where you compose multi-agent workflows as a living graph.",
+  icons: {
+    icon: "/prism-mark.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
