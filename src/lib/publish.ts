@@ -240,20 +240,26 @@ function toPublishSampleRun(
     pathwayLabel: run.pathwayLabel,
     notes: run.notes,
     totals: run.totals,
-    nodeResults: run.nodeResults.map((r) => {
-      const node = byId.get(r.nodeId);
-      return {
-        nodeId: r.nodeId,
-        label: r.label,
-        kind: node?.data.kind,
-        role: node?.data.role,
-        steer: node?.data.steer,
-        model: r.model,
-        status: r.status,
-        output: r.output,
-        metrics: r.metrics,
-      };
-    }),
+    nodeResults: run.nodeResults
+      .filter((r) => {
+        const node = byId.get(r.nodeId);
+        return node?.data.publish?.includeInSamples !== false;
+      })
+      .map((r) => {
+        const node = byId.get(r.nodeId);
+        const redact = Boolean(node?.data.publish?.redactOutput);
+        return {
+          nodeId: r.nodeId,
+          label: r.label,
+          kind: node?.data.kind,
+          role: node?.data.role,
+          steer: node?.data.steer,
+          model: r.model,
+          status: r.status,
+          output: redact ? undefined : r.output,
+          metrics: r.metrics,
+        };
+      }),
   };
 }
 

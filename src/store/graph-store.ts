@@ -4,6 +4,7 @@ import {
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
+  reconnectEdge,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -40,7 +41,7 @@ import { normalizeModelRef } from "@/lib/providers";
 import { createRunStub, type RunRecord } from "@/lib/runs";
 import { STARTER_EDGES, STARTER_NODES } from "@/lib/starter-graph";
 import { getTemplate, TEMPLATES } from "@/lib/templates";
-import type { PrismNodeData, TalkMutation } from "@/lib/types";
+import type { NodeKind, PrismNodeData, TalkMutation } from "@/lib/types";
 
 const SSR_OWNER = { id: "local", name: "Local builder" };
 
@@ -85,7 +86,6 @@ type GraphState = {
   runsOpen: boolean;
   contextPrefsOpen: boolean;
   contextCatalog: ContextCatalog;
-  contextLauncherOpen: boolean;
   contextIntakeActive: boolean;
   layoutEpoch: number;
   hydrate: () => void;
@@ -96,6 +96,14 @@ type GraphState = {
   onConnect: (connection: Connection) => void;
   selectNode: (id: string | null) => void;
   updateSelectedNode: (patch: Partial<PrismNodeData>) => void;
+  updateNode: (id: string, patch: Partial<PrismNodeData>) => void;
+  addNode: (
+    kind: Exclude<PrismNodeData["kind"], "context-source"> | "context-source",
+    opts?: { sourceKind?: ContextSourceKind },
+  ) => string | null;
+  deleteNode: (id: string) => boolean;
+  deleteSelectedNode: () => boolean;
+  onReconnect: (oldEdge: Edge, newConnection: Connection) => void;
   setTalkDraft: (value: string) => void;
   resetRunState: () => void;
   applyTalkEdit: () => void;
@@ -109,7 +117,6 @@ type GraphState = {
   setRunsOpen: (open: boolean) => void;
   setContextPrefsOpen: (open: boolean) => void;
   toggleCatalogKind: (kind: ContextSourceKind) => void;
-  setContextLauncherOpen: (open: boolean) => void;
   setContextIntakeActive: (open: boolean) => void;
   beginContextPass: (kinds: ContextSourceKind[]) => void;
   toggleContextKind: (kind: ContextSourceKind) => void;
@@ -188,8 +195,7 @@ function loadArchOntoCanvas(doc: PrismDocument) {
   return {
     nodes,
     edges: doc.edges.map((e) => ({ ...e })),
-    selectedNodeId:
-      nodes.find((n) => n.data.kind === "context")?.id ?? nodes[0]?.id ?? null,
+    selectedNodeId: null as string | null,
     selectedRunId: doc.runs[0]?.id ?? null,
   };
 }
@@ -208,7 +214,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
     activeId: boot.activeId,
     nodes: bootNodes,
     edges: active.edges,
-    selectedNodeId: "context",
+    selectedNodeId: null,
     selectedRunId: null,
     talkDraft: "",
     lastTalkMutation: null,
@@ -220,7 +226,6 @@ export const useGraphStore = create<GraphState>((set, get) => {
     contextCatalog: {
       enabledKinds: CONTEXT_SOURCE_OPTIONS.map((o) => o.kind),
     },
-    contextLauncherOpen: false,
     contextIntakeActive: false,
     layoutEpoch: 0,
 
@@ -285,8 +290,19 @@ export const useGraphStore = create<GraphState>((set, get) => {
       });
     },
 
-    onNodesChange: (changes) =>
-      set({ nodes: applyNodeChanges(changes, get().nodes), dirty: true }),
+    onNodesChange: (changes) => {
+      const removes = changes.filter(
+        (c): c is NodeChange<Node<PrismNodeData>> & { type: "remove"; id: string } =>
+          c.type === "remove",
+      );
+      const rest = changes.filter((c) => c.type !== "remove");
+      if (rest.length) {
+        set({ nodes: applyNodeChanges(rest, get().nodes), dirty: true });
+      }
+      for (const change of removes) {
+        get().deleteNode(change.id);
+      }
+    },
 
     onEdgesChange: (changes) =>
       set({ edges: applyEdgeChanges(changes, get().edges), dirty: true }),
@@ -300,8 +316,13 @@ export const useGraphStore = create<GraphState>((set, get) => {
     selectNode: (id) => set({ selectedNodeId: id }),
 
     updateSelectedNode: (patch) => {
-      const { selectedNodeId, nodes } = get();
+      const { selectedNodeId } = get();
       if (!selectedNodeId) return;
+      get().updateNode(selectedNodeId, patch);
+    },
+
+    updateNode: (id, patch) => {
+      const { nodes } = get();
       const nextPatch =
         patch.model != null
           ? { ...patch, model: normalizeModelRef(String(patch.model)) }
@@ -309,10 +330,237 @@ export const useGraphStore = create<GraphState>((set, get) => {
       set({
         dirty: true,
         nodes: nodes.map((node) =>
-          node.id === selectedNodeId
+          node.id === id
             ? { ...node, data: { ...node.data, ...nextPatch } }
             : node,
         ),
+      });
+    },
+
+    addNode: (kind, opts) => {
+      const state = get();
+      const selected = state.nodes.find((n) => n.id === state.selectedNodeId);
+      const anchor = selected?.position ?? {
+        x: 400,
+        y: Math.max(0, ...state.nodes.map((n) => n.position.y)) + 160,
+      };
+      const position = {
+        x: Math.round(anchor.x + (selected ? 40 : 0)),
+        y: Math.round(anchor.y + (selected ? 140 : 0)),
+      };
+
+      if (kind === "context-source") {
+        const sourceKind = opts?.sourceKind;
+        if (!sourceKind) {
+          set({
+            lastTalkMutation: {
+              summary: "Pick a context channel kind to add.",
+              applied: false,
+            },
+          });
+          return null;
+        }
+        const existing = state.nodes.find(
+          (n) =>
+            n.data.kind === "context-source" && n.data.sourceKind === sourceKind,
+        );
+        if (existing) {
+          set({
+            selectedNodeId: existing.id,
+            lastTalkMutation: {
+              summary: `${existing.data.label} is already on the graph.`,
+              applied: true,
+            },
+          });
+          return existing.id;
+        }
+
+        const meta = CONTEXT_SOURCE_OPTIONS.find((o) => o.kind === sourceKind);
+        const id = `context-source-${sourceKind}`;
+        const hub =
+          state.nodes.find((n) => n.data.kind === "context") ??
+          state.nodes.find((n) => n.id === "context");
+        const node: Node<PrismNodeData> = {
+          id,
+          type: "context-source",
+          position,
+          data: {
+            kind: "context-source",
+            label: meta?.label ?? sourceKind,
+            sourceKind,
+            role: meta?.hint,
+            status: "idle",
+          },
+        };
+        const edges = [...state.edges];
+        if (hub) {
+          edges.push({
+            id: `e-${id}-${hub.id}`,
+            source: id,
+            target: hub.id,
+            type: "smoothstep",
+          });
+        }
+        const kinds = [
+          ...new Set([
+            ...(activeArch(state)?.enabledContextKinds ?? []),
+            sourceKind,
+          ]),
+        ];
+        const architectures = state.architectures.map((a) =>
+          a.id === state.activeId
+            ? { ...a, enabledContextKinds: kinds, updatedAt: Date.now() }
+            : a,
+        );
+        set({
+          architectures,
+          nodes: [...state.nodes, node],
+          edges,
+          selectedNodeId: id,
+          dirty: true,
+          lastTalkMutation: {
+            summary: `Added ${node.data.label} channel (wired to Context Hub when present). Expand to manage — or drag a handle for late inject.`,
+            applied: true,
+          },
+        });
+        return id;
+      }
+
+      const id = `${kind}-${crypto.randomUUID().slice(0, 8)}`;
+      const stubs: Record<
+        Exclude<NodeKind, "context-source">,
+        PrismNodeData
+      > = {
+        context: {
+          kind: "context",
+          label: "Context Hub",
+          content: "",
+          status: "idle",
+        },
+        router: {
+          kind: "router",
+          label: "Split",
+          role: "Fan context into specialist lanes",
+          steer: "Keep lanes distinct; don’t collapse the brief into one generic ask.",
+          status: "idle",
+          forward: { keepK: 3, stopOnConsensus: false, maxRounds: 1 },
+          publish: { includeInSamples: true, redactOutput: false },
+        },
+        agent: {
+          kind: "agent",
+          label: "Agent",
+          role: "",
+          steer: "",
+          prompt: "",
+          model: "openai:gpt-4o-mini",
+          status: "idle",
+          budget: {},
+          sampling: { temperature: 0.7 },
+          toolsAllowlist: [],
+          outputSchema: "",
+          evalRubric: "",
+          publish: { includeInSamples: true, redactOutput: false },
+        },
+        merge: {
+          kind: "merge",
+          label: "Judge",
+          role: "Merge branches into one recommendation",
+          steer: "One crisp recommendation beats a laundry list.",
+          prompt: "",
+          model: "openai:gpt-4o",
+          status: "idle",
+          budget: {},
+          sampling: { temperature: 0.3 },
+          toolsAllowlist: [],
+          outputSchema: "",
+          forward: { keepK: 3, stopOnConsensus: true, maxRounds: 2 },
+          evalRubric: "",
+          publish: { includeInSamples: true, redactOutput: false },
+        },
+      };
+
+      const data = stubs[kind];
+      const node: Node<PrismNodeData> = {
+        id,
+        type: kind,
+        position,
+        data,
+      };
+
+      set({
+        nodes: [...state.nodes, node],
+        selectedNodeId: id,
+        dirty: true,
+        lastTalkMutation: {
+          summary: `Added ${data.label}. Expand to edit attributes; drag handles to wire it in.`,
+          applied: true,
+        },
+      });
+      return id;
+    },
+
+    deleteNode: (id) => {
+      const state = get();
+      const target = state.nodes.find((n) => n.id === id);
+      if (!target) return false;
+
+      if (target.data.kind === "context") {
+        const hubs = state.nodes.filter((n) => n.data.kind === "context");
+        if (hubs.length <= 1) {
+          set({
+            lastTalkMutation: {
+              summary: "Keep at least one Context Hub on the graph.",
+              applied: false,
+            },
+          });
+          return false;
+        }
+      }
+
+      const nodes = state.nodes.filter((n) => n.id !== id);
+      const edges = state.edges.filter((e) => e.source !== id && e.target !== id);
+
+      let architectures = state.architectures;
+      if (target.data.kind === "context-source" && target.data.sourceKind) {
+        const sk = target.data.sourceKind;
+        architectures = state.architectures.map((a) =>
+          a.id === state.activeId
+            ? {
+                ...a,
+                enabledContextKinds: a.enabledContextKinds.filter((k) => k !== sk),
+                attachedContext: a.attachedContext.filter(
+                  (item) => item.kind !== sk && item.sourceNodeId !== id,
+                ),
+                updatedAt: Date.now(),
+              }
+            : a,
+        );
+      }
+
+      set({
+        architectures,
+        nodes,
+        edges,
+        selectedNodeId: state.selectedNodeId === id ? null : state.selectedNodeId,
+        dirty: true,
+        lastTalkMutation: {
+          summary: `Removed “${target.data.label}” and its edges.`,
+          applied: true,
+        },
+      });
+      return true;
+    },
+
+    deleteSelectedNode: () => {
+      const id = get().selectedNodeId;
+      if (!id) return false;
+      return get().deleteNode(id);
+    },
+
+    onReconnect: (oldEdge, newConnection) => {
+      set({
+        edges: reconnectEdge(oldEdge, newConnection, get().edges),
+        dirty: true,
       });
     },
 
@@ -385,7 +633,6 @@ export const useGraphStore = create<GraphState>((set, get) => {
       saveContextCatalog(next);
       set({ contextCatalog: next });
     },
-    setContextLauncherOpen: (open) => set({ contextLauncherOpen: open }),
     setContextIntakeActive: (open) => set({ contextIntakeActive: open }),
 
     beginContextPass: (kinds) => {
@@ -499,7 +746,6 @@ export const useGraphStore = create<GraphState>((set, get) => {
         nodes: laidOut,
         edges: [...sourceEdges, ...edges],
         selectedNodeId: sourceNodes[0]?.id ?? contextNode.id,
-        contextLauncherOpen: false,
         contextIntakeActive: true,
         dirty: true,
         layoutEpoch: state.layoutEpoch + 1,
@@ -766,7 +1012,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         activeId: created.id,
         nodes: laid,
         edges: created.edges,
-        selectedNodeId: "context",
+        selectedNodeId: null,
         selectedRunId: null,
         dirty: false,
         layoutEpoch: get().layoutEpoch + 1,
@@ -800,7 +1046,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         activeId: created.id,
         nodes: laid,
         edges: created.edges,
-        selectedNodeId: laid.find((n) => n.data.kind === "context")?.id ?? null,
+        selectedNodeId: null,
         selectedRunId: null,
         dirty: false,
         layoutEpoch: get().layoutEpoch + 1,
@@ -873,7 +1119,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         activeId: doc.id,
         nodes: laid,
         edges: doc.edges,
-        selectedNodeId: laid.find((n) => n.data.kind === "context")?.id ?? null,
+        selectedNodeId: null,
         selectedRunId: doc.runs[0]?.id ?? null,
         dirty: false,
         layoutEpoch: get().layoutEpoch + 1,
@@ -890,7 +1136,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
       set({
         nodes: graph.nodes,
         edges: graph.edges,
-        selectedNodeId: "context",
+        selectedNodeId: null,
         dirty: true,
         layoutEpoch: get().layoutEpoch + 1,
         lastTalkMutation: {

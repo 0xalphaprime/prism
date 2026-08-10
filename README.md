@@ -15,7 +15,7 @@ Prism harnesses complexity by giving the system enough structured variety — ro
 
 ## Status
 
-**Ships today:** graph shell, context channels + Hub workspace, Label / Role / **Steer** / Prompt / model per node, architectures (save / template / export), connections + provider verify, docs, publish-package **schema**.
+**Ships today:** graph shell with **Add tile** / **Delete** / rewire (incl. late context inject), select → **Expand** node workspace (Label / Role / **Steer** / Prompt / model), output reading page, architectures (save / template / export), connections + provider verify, docs, publish-package **schema**.
 
 **Next (Block 3):** Step / Run all — execute the pathway, fill outputs and metrics, compose Steer into provider calls.
 
@@ -46,6 +46,7 @@ In the app: **Connections → Verify providers** flips cards to Connected when a
 
 - **[Brand lock](docs/BRAND.md)** — Ashby tagline (canonical)
 - **[Product guide (v1)](docs/GUIDE.md)** — node kinds, Label / Role / Steer / Prompt, pipeline, research mapping
+- **[Variety toolkit](docs/VARIETY.md)** — Ashby-guided attributes & roadmap brainstorm
 - **[Publish package schema](docs/PUBLISH.md)** — portable architecture + sample runs for gallery / fork
 - **[Research notes](RESEARCH.md)** — MoA lineage and orchestration stack
 
