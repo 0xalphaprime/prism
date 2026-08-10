@@ -14,7 +14,7 @@ export function ContextPrefsWorkspace() {
           <p className="sheet-kicker">Context preferences</p>
           <h1>Your channel catalog</h1>
           <p className="sheet-help">
-            Choose which channel types show up in Add context and the context
+            Choose which channel types show up in Add tile and the context
             workspace. Connection status still decides whether intake works.
           </p>
         </div>

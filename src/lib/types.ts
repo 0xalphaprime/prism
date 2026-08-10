@@ -15,6 +15,36 @@ export type NodeMetrics = {
   costUsd?: number;
 };
 
+/** Per-node spend ceilings — enforced in Block 3 */
+export type NodeBudget = {
+  maxTokensOut?: number;
+  maxLatencyMs?: number;
+  maxCostUsd?: number;
+};
+
+/** Sampling controls for reproducible sweeps */
+export type NodeSampling = {
+  temperature?: number;
+  seed?: number;
+};
+
+/**
+ * SMoA-style forward control: how much upstream talk survives
+ * and whether deeper rounds stop early.
+ */
+export type NodeForward = {
+  /** Top-k upstream texts to pass forward (e.g. 3) */
+  keepK?: number;
+  stopOnConsensus?: boolean;
+  /** Cap on refine / debate rounds */
+  maxRounds?: number;
+};
+
+export type NodePublish = {
+  includeInSamples?: boolean;
+  redactOutput?: boolean;
+};
+
 export type PrismNodeData = {
   kind: NodeKind;
   label: string;
@@ -32,6 +62,17 @@ export type PrismNodeData = {
   metrics?: NodeMetrics;
   /** Set on context-source tiles — which channel this upstream node owns */
   sourceKind?: ContextSourceKind;
+  budget?: NodeBudget;
+  sampling?: NodeSampling;
+  /** Narrow tool names/ids this node may use (keep ≤~5) */
+  toolsAllowlist?: string[];
+  /** Short schema or shape the output should follow */
+  outputSchema?: string;
+  /** Keep-k / early-stop — typically on router or merge */
+  forward?: NodeForward;
+  /** Checklist for later run compare / Judge */
+  evalRubric?: string;
+  publish?: NodePublish;
 };
 
 export type TalkMutation = {

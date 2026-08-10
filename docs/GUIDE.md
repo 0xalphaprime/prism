@@ -52,12 +52,18 @@ Around the graph:
 
 | Surface | Job |
 |---------|-----|
+| **Add tile** | Place Agent / Split / Judge / Context Hub / context channels |
+| **Select → Expand** | Full node workspace: Label, Role, Steer, Model, Prompt, **Controls** (budget, sampling, tools, schema, forward, rubric, publish), metrics |
+| **Open output** | Full-page artifact view for that node |
+| **Drag handles** | Rewire edges (Hub is default; late inject allowed) |
+| **Delete** | Remove selected tile (+ edges); last Context Hub protected |
 | **Prompt** (`/prompt`) | Architecture-level *run intent* for the whole pathway |
 | **Context** (`/context`) | Attach and manage payloads for each channel |
 | **Connections** (`/connections`) | Provider / API / feed readiness |
-| **Inspector** (right rail) | Per-node Label, Role, Steer, Model, Prompt, Output, Metrics |
 | **Runs** | Checkpoints and history (execution fills results in Block 3) |
 | **Talk** | Natural-language edits that land on the same graph |
+
+**Topology note.** Channels default into **Context Hub**, then Split → agents → Judge. You may also drag a channel (or Hub) **directly into a downstream node** for intentional late context inject. See [`VARIETY.md`](VARIETY.md) for the toolkit roadmap.
 
 ---
 
@@ -85,9 +91,11 @@ These terms are locked vocabulary for the lab. Use them consistently in UI, docs
 |------|---------|--------------------|----------|
 | `context-source` | Channel tile (Browser, Documents, …) | Label; attachments via Context workspace | Context count / payloads |
 | `context` | **Context Hub** | Label; hub notes | Merged upstream stream |
-| `router` | **Split** | Label, **Role**, **Steer** | Fan-out into specialist lanes |
-| `agent` | Specialist (Researcher, Writer, …) | Label, **Role**, **Steer**, Model, Prompt | Output + metrics |
-| `merge` | **Judge** | Label, **Role**, **Steer**, Model, Prompt | Synthesized output + metrics |
+| `router` | **Split** | Label, **Role**, **Steer**, forward (keep-k / stop), publish | Fan-out into specialist lanes |
+| `agent` | Specialist (Researcher, Writer, …) | Label, **Role**, **Steer**, Model, Prompt, budget, sampling, tools, schema, rubric, publish | Output + metrics |
+| `merge` | **Judge** | Label, **Role**, **Steer**, Model, Prompt, + same Controls as agent, plus forward | Synthesized output + metrics |
+
+**Inputs.** Upstream edges define what a node can see — there is no separate input-map editor. **Controls** store run policy for Block 3; they do not execute until then.
 
 **Label vs Role vs Steer vs Prompt**
 
@@ -184,7 +192,7 @@ Prism is the visualization and control surface for patterns documented in [`RESE
 | Methodology | Idea | Prism shape today / next |
 |-------------|------|---------------------------|
 | **Classic MoA** | Diverse proposers + strong synthesizer; re-inject user intent | Hub → Split → diverse agents → Judge |
-| **SMoA** | Roles + keep top‑*k* messages + moderator depth | Distinct Role/Steer now; keep‑*k* / early-stop later |
+| **SMoA** | Roles + keep top‑*k* messages + moderator depth | Distinct Role/Steer; Expand **forward** (keepK / stop / maxRounds) — enforced in Block 3 |
 | **RouteMoA** | Sparse *activation* — choose who runs before paying inference | Split evolves into a budgeted router over a model pool |
 | **Faster-MoA** | Sparse topology + serving co-design | Later: tree-ish graphs, early exit |
 | **Fan-out / fan-in** (Ganji) | Decompose → parallel → synthesize | Starter MoA template |
@@ -207,13 +215,13 @@ RUNTIME     →  explicit graph state, inspectable artifacts
 
 Recommended first path:
 
-1. **Place context channels** with **Add** on the canvas (Browser, Documents, Knowledge, Skills, …).
-2. **Attach payloads** in **Context** (`/context`) — footers on tiles show `Context (N)`.
+1. **Add tile** — place agents, Split, Judge, and/or context channels; wire with drag handles.
+2. **Attach payloads** in **Context** (`/context`) — footers show `Context (N)`.
 3. Set the architecture **Prompt** (`/prompt`) — the run intent.
-4. Select **Split** and each specialist: tune **Label**, **Role**, **Steer**, and (for agents/Judge) **Model** + **Prompt**.
+4. **Select** a tile → **Expand** (or double-click); fill **Label**, **Role**, **Steer**, **Model**, **Prompt**, and **Controls** as needed. **Open output** for artifacts. **Delete** tiles you no longer want.
 5. **Clean layout** if tiles overlap; **Save architecture**.
 6. **Log checkpoint** to start run history even before full execution.
-7. **Step / Run all** (Block 3) — then read **Output** and **Metrics** in the inspector; compare in **Runs**.
+7. **Step / Run all** (Block 3) — then open outputs per node; compare in **Runs**.
 8. **Duplicate** the architecture to A/B a variable (model, steer, context set) without losing the prior pathway.
 
 Talk bar examples that mutate the same graph: `add a summarizer before the judge`, `use the cheaper model on research`.

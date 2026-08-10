@@ -7,10 +7,14 @@ import {
   MiniMap,
   ReactFlow,
   useReactFlow,
+  type Connection,
+  type Edge,
   type Node,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect } from "react";
 import { nodeTypes } from "@/components/nodes";
 import type { PrismNodeData } from "@/lib/types";
 import { useGraphStore } from "@/store/graph-store";
@@ -52,12 +56,29 @@ function ApplyLayoutRevision() {
 }
 
 export function FlowCanvas() {
+  const router = useRouter();
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
   const onNodesChange = useGraphStore((s) => s.onNodesChange);
   const onEdgesChange = useGraphStore((s) => s.onEdgesChange);
   const onConnect = useGraphStore((s) => s.onConnect);
+  const onReconnect = useGraphStore((s) => s.onReconnect);
   const selectNode = useGraphStore((s) => s.selectNode);
+
+  const onNodeDoubleClick = useCallback<NodeMouseHandler>(
+    (_event, node) => {
+      selectNode(node.id);
+      router.push(`/node/${node.id}`);
+    },
+    [router, selectNode],
+  );
+
+  const handleReconnect = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      onReconnect(oldEdge, newConnection);
+    },
+    [onReconnect],
+  );
 
   return (
     <div className="canvas-surface">
@@ -67,6 +88,11 @@ export function FlowCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onReconnect={handleReconnect}
+        edgesReconnectable
+        nodesConnectable
+        elementsSelectable
+        deleteKeyCode={["Backspace", "Delete"]}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{ padding: 0.22, maxZoom: 1.05 }}
@@ -75,6 +101,7 @@ export function FlowCanvas() {
           const first = selected[0] as Node<PrismNodeData> | undefined;
           selectNode(first?.id ?? null);
         }}
+        onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={() => selectNode(null)}
         defaultEdgeOptions={{
           type: "smoothstep",
