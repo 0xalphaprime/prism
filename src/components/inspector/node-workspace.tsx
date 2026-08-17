@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { MODEL_OPTIONS, modelLabel, normalizeModelRef, type ModelRef } from "@/lib/providers";
+import {
+  modelLabel,
+  normalizeModelRef,
+  orderedModelOptions,
+  type ModelRef,
+} from "@/lib/providers";
 import type {
   NodeBudget,
   NodeForward,
@@ -23,6 +28,8 @@ export function NodeWorkspace({ nodeId }: NodeWorkspaceProps) {
   const nodes = useGraphStore((s) => s.nodes);
   const selectNode = useGraphStore((s) => s.selectNode);
   const updateNode = useGraphStore((s) => s.updateNode);
+  const defaultProvider = useGraphStore((s) => s.providerPrefs.defaultProvider);
+  const saveNodeAsPreset = useGraphStore((s) => s.saveNodeAsPreset);
 
   useEffect(() => {
     hydrate();
@@ -52,10 +59,12 @@ export function NodeWorkspace({ nodeId }: NodeWorkspaceProps) {
     );
   }
 
-  const modelValue = normalizeModelRef(data.model);
+  const modelValue = normalizeModelRef(data.model, defaultProvider);
+  const modelOptions = orderedModelOptions(defaultProvider);
   const isDownstream =
     data.kind === "agent" || data.kind === "merge" || data.kind === "router";
-  const showModelPrompt = data.kind === "agent" || data.kind === "merge";
+  const showModelPrompt =
+    data.kind === "agent" || data.kind === "merge" || data.kind === "router";
   const showControls = isDownstream;
   const outputPreview = data.output?.trim() ?? "";
   const hasOutput = Boolean(outputPreview);
@@ -143,14 +152,29 @@ export function NodeWorkspace({ nodeId }: NodeWorkspaceProps) {
                     patch({ model: e.target.value as ModelRef })
                   }
                 >
-                  {MODEL_OPTIONS.map((model) => (
-                    <option key={model.ref} value={model.ref}>
-                      {model.label} · {model.provider}
-                    </option>
-                  ))}
+                  <optgroup label={`${defaultProvider} (default channel)`}>
+                    {modelOptions
+                      .filter((m) => m.provider === defaultProvider)
+                      .map((model) => (
+                        <option key={model.ref} value={model.ref}>
+                          {model.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                  <optgroup label="Other channels">
+                    {modelOptions
+                      .filter((m) => m.provider !== defaultProvider)
+                      .map((model) => (
+                        <option key={model.ref} value={model.ref}>
+                          {model.label} · {model.provider}
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
               </label>
-              <p className="field-hint">{modelLabel(modelValue)}</p>
+              <p className="field-hint">
+                {modelLabel(modelValue)} — default channel set in Connections
+              </p>
               <label className="field">
                 <span>Prompt</span>
                 <textarea
@@ -188,8 +212,58 @@ export function NodeWorkspace({ nodeId }: NodeWorkspaceProps) {
           </section>
 
           <MetricsBlock data={data} />
+
+          {isDownstream ? (
+            <SaveAsPresetCard
+              defaultName={data.label}
+              onSave={(name) => saveNodeAsPreset(nodeId, name)}
+            />
+          ) : null}
         </aside>
       </div>
+    </section>
+  );
+}
+
+function SaveAsPresetCard({
+  defaultName,
+  onSave,
+}: {
+  defaultName: string;
+  onSave: (name: string) => boolean;
+}) {
+  const [name, setName] = useState(defaultName);
+  const [note, setNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(defaultName);
+  }, [defaultName]);
+
+  return (
+    <section className="node-workspace-card">
+      <h2>Save as preset</h2>
+      <p className="sheet-help">
+        Reusable role pack for Add tile — Role, Steer, Prompt, Model, Controls.
+      </p>
+      <label className="field">
+        <span>Preset name</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Harsh Critic"
+        />
+      </label>
+      <button
+        type="button"
+        className="btn btn-accent"
+        onClick={() => {
+          const ok = onSave(name);
+          setNote(ok ? `Saved “${name.trim()}”.` : "Could not save — check the name.");
+        }}
+      >
+        Save as preset
+      </button>
+      {note ? <p className="field-hint">{note}</p> : null}
     </section>
   );
 }
@@ -202,7 +276,8 @@ function ControlsSection({
   patch: (data: Partial<PrismNodeData>) => void;
 }) {
   const showLlmControls =
-    data.kind === "agent" || data.kind === "merge";
+    data.kind === "agent" || data.kind === "merge" || data.kind === "router";
+  const showAgentExtras = data.kind === "agent" || data.kind === "merge";
   const showForward =
     data.kind === "router" || data.kind === "merge";
 
@@ -309,35 +384,44 @@ function ControlsSection({
             </div>
           </fieldset>
 
-          <ToolsAllowlistField
-            value={data.toolsAllowlist ?? []}
-            onChange={(toolsAllowlist) => patch({ toolsAllowlist })}
-          />
+          {showAgentExtras ? (
+            <>
+              <ToolsAllowlistField
+                value={data.toolsAllowlist ?? []}
+                onChange={(toolsAllowlist) => patch({ toolsAllowlist })}
+              />
 
-          <label className="field">
-            <span>Output schema</span>
-            <textarea
-              rows={4}
-              className="node-workspace-textarea"
-              value={data.outputSchema ?? ""}
-              onChange={(e) => patch({ outputSchema: e.target.value })}
-              placeholder='e.g. JSON: { "decision": string, "rationale": string }'
-            />
-          </label>
-          <p className="field-hint">
-            Shape the model should aim for — free text or JSON sketch.
-          </p>
+              <label className="field">
+                <span>Output schema</span>
+                <textarea
+                  rows={4}
+                  className="node-workspace-textarea"
+                  value={data.outputSchema ?? ""}
+                  onChange={(e) => patch({ outputSchema: e.target.value })}
+                  placeholder='e.g. JSON: { "decision": string, "rationale": string }'
+                />
+              </label>
+              <p className="field-hint">
+                Shape the model should aim for — free text or JSON sketch.
+              </p>
 
-          <label className="field">
-            <span>Eval rubric</span>
-            <textarea
-              rows={4}
-              className="node-workspace-textarea"
-              value={data.evalRubric ?? ""}
-              onChange={(e) => patch({ evalRubric: e.target.value })}
-              placeholder="Checklist for later compare / Judge scoring"
-            />
-          </label>
+              <label className="field">
+                <span>Eval rubric</span>
+                <textarea
+                  rows={4}
+                  className="node-workspace-textarea"
+                  value={data.evalRubric ?? ""}
+                  onChange={(e) => patch({ evalRubric: e.target.value })}
+                  placeholder="Checklist for later compare / Judge scoring"
+                />
+              </label>
+            </>
+          ) : (
+            <p className="field-hint">
+              Split uses a fixed route-plan JSON schema at run time (activate
+              lanes + briefs).
+            </p>
+          )}
         </>
       ) : null}
 

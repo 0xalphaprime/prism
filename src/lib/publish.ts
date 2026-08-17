@@ -13,6 +13,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { ContextSourceKind } from "./context-sources";
 import type { PrismDocument } from "./document";
+import { newId } from "./id";
 import type { ModelRef } from "./providers";
 import type { RunRecord } from "./runs";
 import type { NodeMetrics, PrismNodeData, RunStatus } from "./types";
@@ -307,7 +308,7 @@ export function buildPublishPackage(
   return {
     kind: PUBLISH_FILE_KIND,
     schemaVersion: PUBLISH_SCHEMA_VERSION,
-    packageId: crypto.randomUUID(),
+    packageId: newId(),
     listing: {
       slug: opts.slug,
       title: doc.name,

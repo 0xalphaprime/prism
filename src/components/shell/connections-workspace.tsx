@@ -6,6 +6,7 @@ import {
   connectionStatusLabel,
   type PrismConnection,
 } from "@/lib/connections";
+import { PROVIDERS, type ProviderId } from "@/lib/providers";
 import { useGraphStore } from "@/store/graph-store";
 
 type ProbeRow = {
@@ -51,6 +52,11 @@ export function ConnectionsWorkspace() {
   const updateConnection = useGraphStore((s) => s.updateConnection);
   const applyProviderProbes = useGraphStore((s) => s.applyProviderProbes);
   const applyFeedProbes = useGraphStore((s) => s.applyFeedProbes);
+  const defaultProvider = useGraphStore((s) => s.providerPrefs.defaultProvider);
+  const setDefaultProvider = useGraphStore((s) => s.setDefaultProvider);
+  const applyDefaultProviderToGraph = useGraphStore(
+    (s) => s.applyDefaultProviderToGraph,
+  );
 
   const [verifying, setVerifying] = useState(false);
   const [verifyNote, setVerifyNote] = useState<string | null>(null);
@@ -122,7 +128,9 @@ export function ConnectionsWorkspace() {
           <h1>Upstream feeds for {active.name}</h1>
           <p className="sheet-help">
             Keys live in <code>.env.local</code>. Verify pings model providers and
-            context feeds — Connected means the probe worked.
+            context feeds — Connected means the probe worked. Pick a{" "}
+            <strong>default model channel</strong> so new tiles pull from one key
+            (OpenRouter is great for variety).
           </p>
           {verifyNote ? <p className="connection-verify-note">{verifyNote}</p> : null}
         </div>
@@ -137,6 +145,46 @@ export function ConnectionsWorkspace() {
           </button>
         </div>
       </header>
+
+      <section className="default-provider-card">
+        <h3 className="connection-section-title">Default model channel</h3>
+        <p className="sheet-help">
+          New Split / agent / Judge tiles default to this channel. Expand still
+          lets you pick any model. OpenRouter = one key, many labs (GPT, Claude,
+          Llama, Gemini…).
+        </p>
+        <div className="default-provider-row">
+          <label className="field">
+            <span>Channel</span>
+            <select
+              value={defaultProvider}
+              onChange={(e) =>
+                setDefaultProvider(e.target.value as ProviderId)
+              }
+            >
+              {PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                  {p.id === "openrouter" ? " — one key, many models" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => applyDefaultProviderToGraph()}
+          >
+            Apply to this graph
+          </button>
+        </div>
+        <p className="field-hint">
+          Env key for {PROVIDERS.find((p) => p.id === defaultProvider)?.label}:{" "}
+          <code>
+            {PROVIDERS.find((p) => p.id === defaultProvider)?.apiKeyEnv}
+          </code>
+        </p>
+      </section>
 
       <h3 className="connection-section-title">Model providers</h3>
       <ul className="connection-list">

@@ -24,6 +24,10 @@ export const STARTER_NODES: Node<PrismNodeData>[] = [
       label: "Split",
       role: "Fan context into specialist lanes",
       steer: "Keep lanes distinct; don’t collapse the brief into one generic ask.",
+      prompt:
+        "Decide which specialist lanes should run. Activate only lanes that add real variety; skip redundant ones. Give each activated lane a short brief.",
+      model: "openai:gpt-4o-mini",
+      sampling: { temperature: 0.2 },
       status: "idle",
     },
   },

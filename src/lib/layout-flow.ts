@@ -62,7 +62,7 @@ export function layoutPrismFlow(
   );
 
   // Stable, readable order for specialist lanes
-  const agentOrder = ["research", "draft", "critique", "summarizer"];
+  const agentOrder = ["student", "research", "draft", "teacher", "critique", "summarizer"];
   agents.sort((a, b) => {
     const ai = agentOrder.indexOf(a.id);
     const bi = agentOrder.indexOf(b.id);

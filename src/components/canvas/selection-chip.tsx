@@ -52,6 +52,11 @@ export function SelectionChip() {
         <Link href={`/node/${node.id}`} className="btn btn-accent">
           Expand
         </Link>
+        {node.data.output ? (
+          <Link href={`/node/${node.id}/output`} className="btn">
+            Open output
+          </Link>
+        ) : null}
         <button
           type="button"
           className="btn"
