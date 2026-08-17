@@ -3,7 +3,7 @@
 **Audience.** Builders using Prism as a mixture-of-agents (MoA) laboratory.  
 **Companion.** Deep paper notes live in [`RESEARCH.md`](../RESEARCH.md). This guide is product-first.  
 **Tagline.** *Only variety can absorb variety.* — W. Ross Ashby  
-**Last updated.** 2026-08-09
+**Last updated.** 2026-08-16
 
 ---
 
@@ -13,7 +13,7 @@
 
 Prism is a visual, no-code **MoA laboratory**. You compose multi-agent pathways as a living graph: bring context in upstream, assign specialists and models to each branch, define variables at every step, then step or run through the system and inspect what each node produces.
 
-The real objective is not a black-box chat. It is to **produce inspectable data and outputs along the way** — sequential, incremental work you can version, compare, and refine.
+The real objective is not a black-box chat. It is to **produce inspectable data and outputs along the way** — sequential, incremental work you can version, compare, and refine. The **graph** is how you compose the pathway. **Trace** (`/trace`) is how you **read the run as an MoA report**: a compact spine of who fed whom, then cells in graph order (full output, ingest, optional reasoning) and JSON / JSONL export.
 
 The canvas is there so someone can *see*:
 
@@ -52,15 +52,15 @@ Around the graph:
 
 | Surface | Job |
 |---------|-----|
-| **Add tile** | Place Agent / Split / Judge / Context Hub / context channels |
-| **Select → Expand** | Full node workspace: Label, Role, Steer, Model, Prompt, **Controls** (budget, sampling, tools, schema, forward, rubric, publish), metrics |
-| **Open output** | Full-page artifact view for that node |
+| **Add tile** | Blank kinds, **node presets** (role packs), Context Hub / channels |
+| **Select → Expand** | Full node workspace: Label, Role, Steer, Model, Prompt, **Controls**, **Save as preset**, metrics |
+| **Open output** | Optional full-page artifact for one tile |
 | **Drag handles** | Rewire edges (Hub is default; late inject allowed) |
 | **Delete** | Remove selected tile (+ edges); last Context Hub protected |
 | **Prompt** (`/prompt`) | Architecture-level *run intent* for the whole pathway |
 | **Context** (`/context`) | Attach and manage payloads for each channel |
-| **Connections** (`/connections`) | Provider / API / feed readiness |
-| **Runs** | Checkpoints and history (execution fills results in Block 3) |
+| **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
+| **Trace** (`/trace`) | MoA graph report — spine, cells in graph order, exhaust, Copy all / JSON / JSONL |
 | **Talk** | Natural-language edits that land on the same graph |
 
 **Topology note.** Channels default into **Context Hub**, then Split → agents → Judge. You may also drag a channel (or Hub) **directly into a downstream node** for intentional late context inject. See [`VARIETY.md`](VARIETY.md) for the toolkit roadmap.
@@ -83,7 +83,11 @@ These terms are locked vocabulary for the lab. Use them consistently in UI, docs
 | **Output** | Text artifact produced by a node after a step or run |
 | **Metrics** | Latency, tokens, estimated cost for that node’s work |
 | **Architecture** | A saved Prism document: graph + meta + attachments + runs |
+| **Architecture template** | Whole pathway starter (Starter MoA, debate, blank) |
+| **Node preset** | Reusable role pack for one tile: Role / Steer / Prompt / Model / Controls (local library) |
 | **Attached context** | Library items carried from channel tiles through the Hub into the stream |
+
+**Presets vs templates.** Architecture templates drop an entire graph. Node presets drop *one* specialist with soul — Researcher, Critic, Red-team, crisp Judge, etc. Save from Expand → **Save as preset**; place from Add tile → **Presets**. Models remap to your default channel when placed.
 
 ### Kind ↔ fields
 
@@ -91,11 +95,11 @@ These terms are locked vocabulary for the lab. Use them consistently in UI, docs
 |------|---------|--------------------|----------|
 | `context-source` | Channel tile (Browser, Documents, …) | Label; attachments via Context workspace | Context count / payloads |
 | `context` | **Context Hub** | Label; hub notes | Merged upstream stream |
-| `router` | **Split** | Label, **Role**, **Steer**, forward (keep-k / stop), publish | Fan-out into specialist lanes |
+| `router` | **Split** | Label, **Role**, **Steer**, Model, Prompt, sampling/budget, forward, publish | LLM **route plan** (which lanes activate + briefs) |
 | `agent` | Specialist (Researcher, Writer, …) | Label, **Role**, **Steer**, Model, Prompt, budget, sampling, tools, schema, rubric, publish | Output + metrics |
 | `merge` | **Judge** | Label, **Role**, **Steer**, Model, Prompt, + same Controls as agent, plus forward | Synthesized output + metrics |
 
-**Inputs.** Upstream edges define what a node can see — there is no separate input-map editor. **Controls** store run policy for Block 3; they do not execute until then.
+**Inputs.** Upstream edges define what a node can see — there is no separate input-map editor. **Controls** (temperature, max tokens, keep-k, schema hint) are applied when Step / Run all execute.
 
 **Label vs Role vs Steer vs Prompt**
 
@@ -138,14 +142,19 @@ Steer is **proximal**: it sits next to the node’s Role and Prompt and nudges e
 
 ### Composition at run time (Block 3)
 
-When Step / Run all land, each downstream call should compose roughly:
+**Step** runs the next ready node (prefer the selected router/agent/merge when ready). **Run all** walks until nothing remains or a node errors.
+
+Pack order on the starter pathway: channels/Hub (text pack) → **Split** (LLM route plan) → activated agents → Judge. Skipped agents get a clear skip note so the graph never stalls. If the route plan fails to parse, all child agents activate.
+
+Each LLM call composes roughly:
 
 ```
 architecture Prompt  (run intent)
-+ upstream context   (Hub stream / prior outputs)
++ upstream context   (Hub stream / prior outputs / lane brief)
 + Role
 + Steer              (proximal)
 + node Prompt        (task)
++ output schema hint (agents/Judge)
 ```
 
 Steer is the dial for *how* that node behaves on *this* pathway without rewriting the whole task.
@@ -179,7 +188,7 @@ Treat the UI as an experiment control panel. Every knob below is a variable you 
 
 - Output text
 - Latency, tokens in/out, estimated cost
-- Run checkpoints (**Log checkpoint** today; full results in Block 3)
+- Run history on **Trace** (**Step / Run all** fill cells live in **graph order**; spine shows who fed whom; **Copy all** for a chat-pasteable dump; download `prism.trace.json` / `.jsonl`)
 
 **Practice:** when you change variables that matter, **Save**, **Duplicate**, or **Export** the architecture so pathways stay comparable. Checkpoints without topology/prompt snapshots are hard to trust later.
 
@@ -192,12 +201,12 @@ Prism is the visualization and control surface for patterns documented in [`RESE
 | Methodology | Idea | Prism shape today / next |
 |-------------|------|---------------------------|
 | **Classic MoA** | Diverse proposers + strong synthesizer; re-inject user intent | Hub → Split → diverse agents → Judge |
-| **SMoA** | Roles + keep top‑*k* messages + moderator depth | Distinct Role/Steer; Expand **forward** (keepK / stop / maxRounds) — enforced in Block 3 |
+| **SMoA** | Roles + keep top‑*k* messages + moderator depth | Distinct Role/Steer; Expand **forward** keepK applied when packing upstream |
 | **RouteMoA** | Sparse *activation* — choose who runs before paying inference | Split evolves into a budgeted router over a model pool |
 | **Faster-MoA** | Sparse topology + serving co-design | Later: tree-ish graphs, early exit |
 | **Fan-out / fan-in** (Ganji) | Decompose → parallel → synthesize | Starter MoA template |
 | **Debate / refine** | Opposing specialists or critic loops | Parallel debate template; refine cycles later |
-| **Durable runs + observability** | Checkpoints, traces, $/agent | Runs panel → Block 3 traces and metrics |
+| **Durable runs + observability** | Checkpoints, traces, $/agent | **Trace** graph report + JSON/JSONL export |
 
 ### What we are optimizing for in the lab
 
@@ -220,9 +229,23 @@ Recommended first path:
 3. Set the architecture **Prompt** (`/prompt`) — the run intent.
 4. **Select** a tile → **Expand** (or double-click); fill **Label**, **Role**, **Steer**, **Model**, **Prompt**, and **Controls** as needed. **Open output** for artifacts. **Delete** tiles you no longer want.
 5. **Clean layout** if tiles overlap; **Save architecture**.
-6. **Log checkpoint** to start run history even before full execution.
-7. **Step / Run all** (Block 3) — then open outputs per node; compare in **Runs**.
+6. **Log checkpoint** if you want a snapshot before executing.
+7. **Step / Run all** — Prism jumps to **Trace**. The header spine is the graph. Cells fill in **graph order** (not who finished first). **Expand exhaust** for role / steer / **ingest** / reasoning / metrics. **Copy all** pastes the report. Download JSON / JSONL to ingest elsewhere. Tile **Expand** / **Open output** remain optional.
 8. **Duplicate** the architecture to A/B a variable (model, steer, context set) without losing the prior pathway.
+
+### Student vs teachers (Foundry / Nemo)
+
+Use this when you want inspectable exhaust for the local student — not a LoRA run.
+
+1. Click **Student vs teachers** on the architecture bar (or **More → Template…**). If the canvas is empty, that button restores the graph.
+2. Connections: OpenRouter as default channel for *new teacher tiles*. Do **not** click **Apply to this graph** if you only meant to remap teachers — Ollama/Nemo is pinned and will stay, but you still don’t need a full remap.
+3. Put one sharp leftover in Hub notes (or keep the seeded missing-fact brief). Architecture **Prompt** is the run intent.
+4. **Step** (or **Run all**) — you land on **Trace**. Spine plus cells: Hub → specialists → Judge. First pass: Step, not Run all. Copy all / JSONL if you want the branch in an eval pack.
+5. Distill target is a **characteristic card** from Judge (keep / omit / never say) → Foundry `SYSTEM.md`, then `run_eval.py --think`. Do **not** train on Judge dumps.
+
+Nemo talks to Foundry via `OLLAMA_BASE_URL` (`http://100.78.81.94:11434/v1`). If Verify shows Ollama down, the student node errors loudly; teachers can still run.
+
+If the graph grid is empty over a Tailscale URL, Next blocked the client JS — hard-refresh after `allowedDevOrigins` includes that host (see README).
 
 Talk bar examples that mutate the same graph: `add a summarizer before the judge`, `use the cheaper model on research`.
 
@@ -239,9 +262,9 @@ Fork → fill context slots → re-run → compare. Hosted runs (later) can debi
 
 | Horizon | What ships |
 |---------|------------|
-| **Now** | Graph chrome, compact context tiles, Context / Prompt / Connections pages, Role + **Steer**, architectures, checkpoints, publish schema sketch |
-| **Next (Block 3)** | Step / Run all; fill Output + Metrics; compose Steer into provider calls; richer run records; export publish package |
-| **Later** | Gallery / fork; keep‑*k* and routing policies; optional account balance for hosted inference; **many parallel instances** of one pathway for extreme sweeps |
+| **Now** | Graph chrome, **Trace** graph report (spine + cells) + JSON/JSONL, Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
+| **Next** | Compare runs UI; publish export; tighter keep‑k / consensus; tools allowlist at run time |
+| **Later** | Gallery / fork; optional account balance for hosted inference; **many parallel instances** of one pathway for extreme sweeps |
 
 The extreme end-state: define a pathway once, fan many instances with controlled variable grids, and harvest sequential artifacts across the swarm — still inspectable node by node.
 
@@ -271,6 +294,7 @@ The extreme end-state: define a pathway once, fan many instances with controlled
 | Prompt (architecture bar) | Architecture run intent |
 | Clean layout | Re-spread vertical MoA spine |
 | Log checkpoint | Run history stub |
+| Trace (`/trace`) | MoA graph report: spine + cells; JSON / JSONL export |
 | More → Template / Export / … | Architecture library ops |
 
 ---

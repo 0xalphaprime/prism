@@ -1,4 +1,5 @@
 import type { ContextSourceKind } from "./context-sources";
+import { newId } from "./id";
 import type { ProviderId } from "./providers";
 
 /**
@@ -168,7 +169,7 @@ export const CONNECTION_PRESETS: Omit<PrismConnection, "id" | "updatedAt">[] = [
 export function seedConnections(): PrismConnection[] {
   return CONNECTION_PRESETS.map((preset) => ({
     ...preset,
-    id: crypto.randomUUID(),
+    id: newId(),
     updatedAt: Date.now(),
   }));
 }
@@ -219,7 +220,7 @@ export function mergeConnectionPresets(
     } else {
       merged.push({
         ...preset,
-        id: crypto.randomUUID(),
+        id: newId(),
         updatedAt: Date.now(),
       });
     }

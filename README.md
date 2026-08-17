@@ -33,6 +33,8 @@ npm run dev
 
 Open **[http://localhost:3001](http://localhost:3001)** (Prism uses port **3001**, not 3000).
 
+If you open it over Tailscale (e.g. `http://100.111.89.59:3001`), that host must be in `allowedDevOrigins` in `next.config.ts` or Next 16 blocks `/_next` chunks — you’ll see the chrome with an empty canvas. Add other LAN/Tailscale hosts via `PRISM_DEV_ORIGINS` (comma-separated). IDs work over plain HTTP (no `crypto.randomUUID` secure-context requirement).
+
 Provider keys stay in `.env.local` (never commit real keys). `.env*` is gitignored; [`.env.example`](.env.example) lists the empty placeholders.
 
 ```bash

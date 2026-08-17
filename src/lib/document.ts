@@ -5,6 +5,7 @@ import {
   seedConnections,
   type PrismConnection,
 } from "./connections";
+import { newId } from "./id";
 import type { AttachedContext, ContextSourceKind } from "./context-sources";
 import type { PrismUser } from "./identity";
 import { normalizeModelRef } from "./providers";
@@ -74,7 +75,7 @@ export function createDocumentFromGraph(args: {
   const now = Date.now();
   return {
     schemaVersion: DOCUMENT_SCHEMA_VERSION,
-    id: crypto.randomUUID(),
+    id: newId(),
     name: args.name,
     owner: { id: args.owner.id, name: args.owner.name },
     prompt: args.prompt ?? "",
@@ -215,7 +216,7 @@ export function importDocument(
     if (!doc) return null;
     return {
       ...doc,
-      id: crypto.randomUUID(),
+      id: newId(),
       owner: { id: owner.id, name: owner.name },
       updatedAt: Date.now(),
     };
@@ -231,6 +232,8 @@ export function clearRunFields(nodes: Node<PrismNodeData>[]) {
       ...node.data,
       output: undefined,
       metrics: undefined,
+      ingest: undefined,
+      reasoning: undefined,
       status: "idle" as const,
     },
   }));

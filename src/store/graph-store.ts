@@ -36,11 +36,48 @@ import {
 } from "@/lib/context-sources";
 import type { PrismConnection } from "@/lib/connections";
 import { loadUser, renameUser, touchUser, type PrismUser } from "@/lib/identity";
+import { newId } from "@/lib/id";
 import { layoutPrismFlow } from "@/lib/layout-flow";
-import { normalizeModelRef } from "@/lib/providers";
-import { createRunStub, type RunRecord } from "@/lib/runs";
+import {
+  defaultProviderPrefs,
+  loadProviderPrefs,
+  saveProviderPrefs,
+  type ProviderPrefs,
+} from "@/lib/provider-prefs";
+import {
+  deleteUserPreset,
+  extractPresetData,
+  findPreset,
+  loadNodePresets,
+  presetDataToNodeData,
+  saveNodePresets,
+  upsertUserPreset,
+  type NodePreset,
+  type PresetKind,
+} from "@/lib/node-presets";
+import {
+  defaultModelForProvider,
+  normalizeModelRef,
+  remapModelToProvider,
+  type ProviderId,
+} from "@/lib/providers";
+import { backfillIngestOnNodes, executeNodeStep } from "@/lib/run-engine";
+import {
+  isExecutableKind,
+  nextSteppable,
+  type RoutePlan,
+} from "@/lib/run-graph";
+import { createRunStub, assignResultSteps, nodeResultFromGraphNode, type RunRecord } from "@/lib/runs";
 import { STARTER_EDGES, STARTER_NODES } from "@/lib/starter-graph";
+import { CRITIC_MODEL, JUDGE_MODEL, TEACHER_MODEL } from "@/lib/student-graph";
+import {
+  STUDENT_LAB_HUB,
+  STUDENT_LAB_PROMPT,
+  STUDENT_LAB_STEP_ORDER,
+  type StudentLabSeed,
+} from "@/lib/student-lab";
 import { getTemplate, TEMPLATES } from "@/lib/templates";
+import { buildLiveTrace, buildTrace, traceToJsonl } from "@/lib/trace";
 import type { NodeKind, PrismNodeData, TalkMutation } from "@/lib/types";
 
 const SSR_OWNER = { id: "local", name: "Local builder" };
@@ -83,11 +120,16 @@ type GraphState = {
   dirty: boolean;
   promptOpen: boolean;
   connectionsOpen: boolean;
-  runsOpen: boolean;
   contextPrefsOpen: boolean;
   contextCatalog: ContextCatalog;
+  providerPrefs: ProviderPrefs;
+  nodePresets: NodePreset[];
   contextIntakeActive: boolean;
   layoutEpoch: number;
+  /** Live execution — Block 3 */
+  activeRunId: string | null;
+  runBusy: boolean;
+  activeRoutePlan: RoutePlan | null;
   hydrate: () => void;
   renameLocalUser: (name: string) => void;
   relayoutFlow: (opts?: { quiet?: boolean }) => void;
@@ -106,6 +148,8 @@ type GraphState = {
   onReconnect: (oldEdge: Edge, newConnection: Connection) => void;
   setTalkDraft: (value: string) => void;
   resetRunState: () => void;
+  stepRun: () => Promise<void>;
+  runAll: () => Promise<void>;
   applyTalkEdit: () => void;
   selectArchitecture: (id: string) => void;
   cycleArchitecture: (dir: -1 | 1) => void;
@@ -114,9 +158,14 @@ type GraphState = {
   setArchitectureMeta: (patch: Partial<Pick<PrismDocument, "description" | "tags">>) => void;
   setPromptOpen: (open: boolean) => void;
   setConnectionsOpen: (open: boolean) => void;
-  setRunsOpen: (open: boolean) => void;
   setContextPrefsOpen: (open: boolean) => void;
   toggleCatalogKind: (kind: ContextSourceKind) => void;
+  setDefaultProvider: (provider: ProviderId) => void;
+  /** Remap LLM node models onto the default channel */
+  applyDefaultProviderToGraph: () => void;
+  saveNodeAsPreset: (nodeId: string, name: string) => boolean;
+  addNodeFromPreset: (presetId: string) => string | null;
+  deleteNodePreset: (presetId: string) => boolean;
   setContextIntakeActive: (open: boolean) => void;
   beginContextPass: (kinds: ContextSourceKind[]) => void;
   toggleContextKind: (kind: ContextSourceKind) => void;
@@ -148,8 +197,12 @@ type GraphState = {
   duplicateArchitecture: () => void;
   deleteArchitecture: () => void;
   exportActiveArchitecture: () => string;
+  exportActiveTrace: () => string;
+  exportActiveTraceJsonl: () => string;
   importArchitectureJson: (json: string) => void;
   loadStarterIntoActive: () => void;
+  openStudentTeachers: () => void;
+  applyLabSeed: (seed: StudentLabSeed) => void;
 };
 
 function cloneStarterGraph() {
@@ -171,12 +224,66 @@ function flushActive(get: () => GraphState): PrismDocument[] {
       ? {
           ...arch,
           owner: { id: user.id, name: user.name },
-          nodes: normalizeNodes(nodes),
-          edges: edges.map((e) => ({ ...e })),
+          nodes: nodes.length ? normalizeNodes(nodes) : arch.nodes,
+          edges: nodes.length
+            ? edges.map((e) => ({ ...e }))
+            : arch.edges,
           updatedAt: Date.now(),
         }
       : arch,
   );
+}
+
+function repairEmptyArch(arch: PrismDocument): PrismDocument {
+  if (arch.nodes.length > 0) return arch;
+  const built = getTemplate(arch.templateId ?? "starter-moa").build();
+  return {
+    ...arch,
+    nodes: normalizeGraphLayout(normalizeNodes(built.nodes)),
+    edges: built.edges.map((e) => ({ ...e })),
+    prompt: arch.prompt || built.prompt,
+    description: arch.description || built.description,
+    tags: arch.tags.length ? arch.tags : built.tags,
+  };
+}
+
+function pinStudentLabModels(
+  nodes: Node<PrismNodeData>[],
+): Node<PrismNodeData>[] {
+  return nodes.map((node) => {
+    if (node.id === "teacher") {
+      return { ...node, data: { ...node.data, model: TEACHER_MODEL } };
+    }
+    if (node.id === "critique") {
+      return { ...node, data: { ...node.data, model: CRITIC_MODEL } };
+    }
+    if (node.id === "judge") {
+      return { ...node, data: { ...node.data, model: JUDGE_MODEL } };
+    }
+    return node;
+  });
+}
+
+function studentLabModelsNeedPin(nodes: Node<PrismNodeData>[]) {
+  return nodes.some(
+    (n) =>
+      (n.id === "teacher" && n.data.model !== TEACHER_MODEL) ||
+      (n.id === "critique" && n.data.model !== CRITIC_MODEL) ||
+      (n.id === "judge" && n.data.model !== JUDGE_MODEL),
+  );
+}
+
+function applyStudentLabPrompts(arch: PrismDocument): PrismDocument {
+  if (arch.templateId !== "student-teachers") return arch;
+  return {
+    ...arch,
+    prompt: STUDENT_LAB_PROMPT,
+    nodes: pinStudentLabModels(arch.nodes).map((node) =>
+      node.id === "context"
+        ? { ...node, data: { ...node.data, content: STUDENT_LAB_HUB } }
+        : node,
+    ),
+  };
 }
 
 function persist(get: () => GraphState) {
@@ -188,6 +295,238 @@ function persist(get: () => GraphState) {
 
 function activeArch(state: Pick<GraphState, "architectures" | "activeId">) {
   return state.architectures.find((a) => a.id === state.activeId) ?? null;
+}
+
+type StoreGet = () => GraphState;
+type StoreSet = (
+  partial:
+    | Partial<GraphState>
+    | ((state: GraphState) => Partial<GraphState>),
+) => void;
+
+function ensureActiveRun(get: StoreGet, set: StoreSet): string | null {
+  const state = get();
+  const arch = activeArch(state);
+  if (!arch) return null;
+  if (state.activeRunId) {
+    const existing = arch.runs.find((r) => r.id === state.activeRunId);
+    if (existing && existing.status === "running") return state.activeRunId;
+  }
+
+  const stub = createRunStub({
+    architectureId: arch.id,
+    prompt: arch.prompt,
+    pathwayLabel: arch.name,
+  });
+  const run: RunRecord = {
+    ...stub,
+    status: "running",
+    nodeResults: [],
+  };
+  const architectures = state.architectures.map((a) =>
+    a.id === state.activeId
+      ? { ...a, runs: [run, ...a.runs], updatedAt: Date.now() }
+      : a,
+  );
+  set({
+    architectures,
+    activeRunId: run.id,
+    selectedRunId: run.id,
+    dirty: true,
+  });
+  return run.id;
+}
+
+function applyPatchesToNodes(
+  nodes: Node<PrismNodeData>[],
+  patches: Array<{ nodeId: string; patch: Partial<PrismNodeData> }>,
+) {
+  const byId = new Map(patches.map((p) => [p.nodeId, p.patch]));
+  return nodes.map((n) => {
+    const patch = byId.get(n.id);
+    return patch ? { ...n, data: { ...n.data, ...patch } } : n;
+  });
+}
+
+function syncRunFromNodes(
+  get: StoreGet,
+  set: StoreSet,
+  runId: string,
+  nodes: Node<PrismNodeData>[],
+  status?: RunRecord["status"],
+) {
+  const state = get();
+  const prior =
+    state.architectures
+      .find((a) => a.id === state.activeId)
+      ?.runs.find((r) => r.id === runId)?.nodeResults ?? [];
+  const results = assignResultSteps(
+    prior,
+    nodes
+      .filter((n) => isExecutableKind(n.data.kind))
+      .map((n) => nodeResultFromGraphNode(n)),
+  );
+
+  let totals: RunRecord["totals"];
+  const withMetrics = results.filter((r) => r.metrics);
+  if (withMetrics.length) {
+    totals = {
+      latencyMs: withMetrics.reduce(
+        (s, r) => s + (r.metrics?.latencyMs ?? 0),
+        0,
+      ),
+      tokensIn: withMetrics.reduce((s, r) => s + (r.metrics?.tokensIn ?? 0), 0),
+      tokensOut: withMetrics.reduce(
+        (s, r) => s + (r.metrics?.tokensOut ?? 0),
+        0,
+      ),
+      costUsd: withMetrics.reduce((s, r) => s + (r.metrics?.costUsd ?? 0), 0),
+    };
+  }
+
+  const architectures = state.architectures.map((a) =>
+    a.id === state.activeId
+      ? {
+          ...a,
+          runs: a.runs.map((r) =>
+            r.id === runId
+              ? {
+                  ...r,
+                  status: status ?? r.status,
+                  nodeResults: results,
+                  totals: totals ?? r.totals,
+                  finishedAt:
+                    status === "done" ||
+                    status === "error" ||
+                    status === "cancelled"
+                      ? Date.now()
+                      : r.finishedAt,
+                }
+              : r,
+          ),
+          updatedAt: Date.now(),
+        }
+      : a,
+  );
+  set({ architectures, dirty: true });
+}
+
+function finalizeActiveRun(get: StoreGet, set: StoreSet) {
+  const state = get();
+  if (!state.activeRunId) return;
+  const hasError = state.nodes.some((n) => n.data.status === "error");
+  const pending = nextSteppable(state.nodes, state.edges, null);
+  const status: RunRecord["status"] = hasError
+    ? "error"
+    : pending
+      ? "running"
+      : "done";
+  syncRunFromNodes(get, set, state.activeRunId, state.nodes, status);
+  if (status === "done" || status === "error") {
+    set({
+      activeRunId: status === "done" ? null : state.activeRunId,
+      lastTalkMutation: {
+        summary: hasError
+          ? "Run stopped on a node error."
+          : "Run finished — read the Trace.",
+        applied: true,
+      },
+    });
+  }
+}
+
+/** @returns "ok" | "error" | null (nothing to step) */
+async function runOneStep(
+  get: StoreGet,
+  set: StoreSet,
+  opts?: { fromRunAll?: boolean },
+): Promise<"ok" | "error" | null> {
+  const state = get();
+  if (!opts?.fromRunAll && state.runBusy) return null;
+
+  const nodeId = nextSteppable(
+    state.nodes,
+    state.edges,
+    state.selectedNodeId,
+  );
+  if (!nodeId) {
+    if (!opts?.fromRunAll) {
+      set({
+        lastTalkMutation: {
+          summary: "Nothing ready to step — reset run or finish upstream nodes.",
+          applied: false,
+        },
+      });
+    }
+    return null;
+  }
+
+  const runId = ensureActiveRun(get, set);
+  if (!runId) return null;
+
+  if (!opts?.fromRunAll) set({ runBusy: true });
+
+  try {
+    set({
+      dirty: true,
+      nodes: get().nodes.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, status: "running" } }
+          : n,
+      ),
+    });
+
+    const live = get();
+    const arch = activeArch(live);
+    const result = await executeNodeStep({
+      nodeId,
+      nodes: live.nodes,
+      edges: live.edges,
+      attachedContext: arch?.attachedContext ?? [],
+      architecturePrompt: arch?.prompt ?? "",
+      activeRoutePlan: live.activeRoutePlan,
+    });
+
+    const patches = [
+      { nodeId: result.nodeId, patch: result.patch },
+      ...result.sidePatches,
+    ];
+    const nodes = applyPatchesToNodes(get().nodes, patches);
+    set({
+      nodes,
+      dirty: true,
+      activeRoutePlan:
+        result.routePlan !== undefined
+          ? result.routePlan
+          : get().activeRoutePlan,
+      lastTalkMutation: {
+        summary: result.error
+          ? `Step failed on ${nodeId}: ${result.error}`
+          : `Stepped ${nodes.find((n) => n.id === nodeId)?.data.label ?? nodeId}.`,
+        applied: !result.error,
+      },
+    });
+
+    syncRunFromNodes(
+      get,
+      set,
+      runId,
+      get().nodes,
+      result.error ? "error" : "running",
+    );
+
+    if (
+      !opts?.fromRunAll &&
+      !result.error &&
+      !nextSteppable(get().nodes, get().edges, null)
+    ) {
+      finalizeActiveRun(get, set);
+    }
+
+    return result.error ? "error" : "ok";
+  } finally {
+    if (!opts?.fromRunAll) set({ runBusy: false });
+  }
 }
 
 function loadArchOntoCanvas(doc: PrismDocument) {
@@ -221,40 +560,105 @@ export const useGraphStore = create<GraphState>((set, get) => {
     dirty: false,
     promptOpen: false,
     connectionsOpen: false,
-    runsOpen: false,
     contextPrefsOpen: false,
     contextCatalog: {
       enabledKinds: CONTEXT_SOURCE_OPTIONS.map((o) => o.kind),
     },
+    providerPrefs: defaultProviderPrefs(),
+    nodePresets: loadNodePresets(),
     contextIntakeActive: false,
     layoutEpoch: 0,
+    activeRunId: null,
+    runBusy: false,
+    activeRoutePlan: null,
 
     hydrate: () => {
-      if (get().hydrated) return;
+      if (get().hydrated) {
+        const needsPatch = studentLabModelsNeedPin;
+        if (
+          !needsPatch(get().nodes) &&
+          !get().architectures.some((a) => needsPatch(a.nodes))
+        ) {
+          return;
+        }
+        const nodes = pinStudentLabModels(get().nodes);
+        const architectures = get().architectures.map((arch) => ({
+          ...arch,
+          nodes: pinStudentLabModels(arch.nodes),
+        }));
+        set({
+          nodes,
+          architectures,
+          dirty: true,
+          lastTalkMutation: {
+            summary:
+              "Critic is GPT-5.6 Sol; Judge is Grok 4.6 (OpenRouter).",
+            applied: true,
+          },
+        });
+        return;
+      }
       const user = touchUser(loadUser());
       const contextCatalog = loadContextCatalog();
+      const providerPrefs = loadProviderPrefs();
+      const nodePresets = loadNodePresets();
       const library = loadLibrary(user);
-      const current =
-        library.items.find((a) => a.id === library.activeId) ?? library.items[0];
+      let items = library.items.map((arch) => ({
+        ...arch,
+        nodes: normalizeGraphLayout(normalizeNodes(arch.nodes)),
+        owner: arch.owner ?? { id: user.id, name: user.name },
+      }));
+
+      items = items.map(repairEmptyArch).map(applyStudentLabPrompts);
+
+      let current =
+        items.find((a) => a.id === library.activeId) ?? items[0] ?? null;
+      if (!items.some((a) => a.templateId === "student-teachers")) {
+        const built = getTemplate("student-teachers").build();
+        const created = createDocumentFromGraph({
+          name: built.name,
+          owner: user,
+          prompt: built.prompt,
+          description: built.description,
+          tags: built.tags,
+          templateId: built.templateId,
+          nodes: built.nodes,
+          edges: built.edges,
+        });
+        created.nodes = normalizeGraphLayout(normalizeNodes(created.nodes));
+        items = [...items, created];
+        current = created;
+      }
+
+      if (!current) return;
+      current = repairEmptyArch(current);
+      items = items.map((arch) => (arch.id === current.id ? current : arch));
+
       const canvas = loadArchOntoCanvas(current);
-      const items = library.items.map((arch) =>
+      items = items.map((arch) =>
         arch.id === current.id
           ? { ...arch, nodes: canvas.nodes, owner: { id: user.id, name: user.name } }
-          : {
-              ...arch,
-              nodes: normalizeGraphLayout(normalizeNodes(arch.nodes)),
-              owner: arch.owner ?? { id: user.id, name: user.name },
-            },
+          : arch,
       );
       set({
         hydrated: true,
         user,
         contextCatalog,
+        providerPrefs,
+        nodePresets,
         architectures: items,
         activeId: current.id,
         ...canvas,
         dirty: false,
         layoutEpoch: get().layoutEpoch + 1,
+        lastTalkMutation:
+          current.templateId === "student-teachers"
+            ? {
+                summary:
+                  "Opened Student vs teachers — Teacher is Opus 5. Step Hub, then Nemo, then teachers, then Judge.",
+                applied: true,
+              }
+            : null,
       });
       saveLibrary({ schemaVersion: 3, activeId: current.id, items });
     },
@@ -426,7 +830,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         return id;
       }
 
-      const id = `${kind}-${crypto.randomUUID().slice(0, 8)}`;
+      const id = `${kind}-${newId().slice(0, 8)}`;
       const stubs: Record<
         Exclude<NodeKind, "context-source">,
         PrismNodeData
@@ -442,7 +846,12 @@ export const useGraphStore = create<GraphState>((set, get) => {
           label: "Split",
           role: "Fan context into specialist lanes",
           steer: "Keep lanes distinct; don’t collapse the brief into one generic ask.",
+          prompt:
+            "Decide which specialist lanes should run. Activate only lanes that add real variety; skip redundant ones. Give each activated lane a short brief.",
+          model: defaultModelForProvider(get().providerPrefs.defaultProvider),
           status: "idle",
+          budget: {},
+          sampling: { temperature: 0.2 },
           forward: { keepK: 3, stopOnConsensus: false, maxRounds: 1 },
           publish: { includeInSamples: true, redactOutput: false },
         },
@@ -452,7 +861,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
           role: "",
           steer: "",
           prompt: "",
-          model: "openai:gpt-4o-mini",
+          model: defaultModelForProvider(get().providerPrefs.defaultProvider),
           status: "idle",
           budget: {},
           sampling: { temperature: 0.7 },
@@ -467,7 +876,10 @@ export const useGraphStore = create<GraphState>((set, get) => {
           role: "Merge branches into one recommendation",
           steer: "One crisp recommendation beats a laundry list.",
           prompt: "",
-          model: "openai:gpt-4o",
+          model: remapModelToProvider(
+            "openai:gpt-4o",
+            get().providerPrefs.defaultProvider,
+          ),
           status: "idle",
           budget: {},
           sampling: { temperature: 0.3 },
@@ -566,11 +978,57 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     setTalkDraft: (value) => set({ talkDraft: value }),
 
-    resetRunState: () =>
+    resetRunState: () => {
+      const state = get();
+      let architectures = state.architectures;
+      if (state.activeRunId) {
+        architectures = architectures.map((a) =>
+          a.id === state.activeId
+            ? {
+                ...a,
+                runs: a.runs.map((r) =>
+                  r.id === state.activeRunId && r.status === "running"
+                    ? { ...r, status: "cancelled" as const, finishedAt: Date.now() }
+                    : r,
+                ),
+                updatedAt: Date.now(),
+              }
+            : a,
+        );
+      }
       set({
         dirty: true,
-        nodes: clearRunFields(get().nodes),
-      }),
+        nodes: clearRunFields(state.nodes),
+        architectures,
+        activeRunId: null,
+        runBusy: false,
+        activeRoutePlan: null,
+        lastTalkMutation: {
+          summary: "Cleared node outputs and cancelled the active run.",
+          applied: true,
+        },
+      });
+    },
+
+    stepRun: async () => {
+      await runOneStep(get, set);
+    },
+
+    runAll: async () => {
+      if (get().runBusy) return;
+      set({ runBusy: true });
+      try {
+        // Cap iterations to avoid infinite loops on bad graphs
+        for (let i = 0; i < 64; i++) {
+          const stepped = await runOneStep(get, set, { fromRunAll: true });
+          if (!stepped) break;
+          if (stepped === "error") break;
+        }
+        finalizeActiveRun(get, set);
+      } finally {
+        set({ runBusy: false });
+      }
+    },
 
     selectArchitecture: (id) => {
       const state = get();
@@ -626,13 +1084,165 @@ export const useGraphStore = create<GraphState>((set, get) => {
 
     setPromptOpen: (open) => set({ promptOpen: open }),
     setConnectionsOpen: (open) => set({ connectionsOpen: open }),
-    setRunsOpen: (open) => set({ runsOpen: open }),
     setContextPrefsOpen: (open) => set({ contextPrefsOpen: open }),
     toggleCatalogKind: (kind) => {
       const next = toggleKindInCatalog(get().contextCatalog, kind);
       saveContextCatalog(next);
       set({ contextCatalog: next });
     },
+
+    setDefaultProvider: (provider) => {
+      const providerPrefs = { defaultProvider: provider };
+      saveProviderPrefs(providerPrefs);
+      set({
+        providerPrefs,
+        lastTalkMutation: {
+          summary: `Default model channel → ${provider}. New tiles use this channel; Apply to remap the graph.`,
+          applied: true,
+        },
+      });
+    },
+
+    applyDefaultProviderToGraph: () => {
+      const provider = get().providerPrefs.defaultProvider;
+      const nodes = get().nodes.map((n) => {
+        if (
+          n.data.kind !== "agent" &&
+          n.data.kind !== "merge" &&
+          n.data.kind !== "router"
+        ) {
+          return n;
+        }
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            model: remapModelToProvider(n.data.model, provider),
+          },
+        };
+      });
+      set({
+        nodes,
+        dirty: true,
+        lastTalkMutation: {
+          summary: `Remapped Split / agent / Judge models onto ${provider}.`,
+          applied: true,
+        },
+      });
+    },
+
+    saveNodeAsPreset: (nodeId, name) => {
+      const node = get().nodes.find((n) => n.id === nodeId);
+      if (!node) return false;
+      const kind = node.data.kind;
+      if (kind !== "agent" && kind !== "merge" && kind !== "router") {
+        set({
+          lastTalkMutation: {
+            summary: "Only Split, agent, and Judge tiles can become presets.",
+            applied: false,
+          },
+        });
+        return false;
+      }
+      const trimmed = name.trim();
+      if (!trimmed) {
+        set({
+          lastTalkMutation: {
+            summary: "Name the preset before saving.",
+            applied: false,
+          },
+        });
+        return false;
+      }
+      const nodePresets = upsertUserPreset(get().nodePresets, {
+        name: trimmed,
+        kind: kind as PresetKind,
+        data: extractPresetData(node.data),
+      });
+      saveNodePresets(nodePresets);
+      set({
+        nodePresets,
+        lastTalkMutation: {
+          summary: `Saved preset “${trimmed}” — place it from Add tile → Presets.`,
+          applied: true,
+        },
+      });
+      return true;
+    },
+
+    addNodeFromPreset: (presetId) => {
+      const state = get();
+      const preset = findPreset(state.nodePresets, presetId);
+      if (!preset) {
+        set({
+          lastTalkMutation: {
+            summary: "Preset not found.",
+            applied: false,
+          },
+        });
+        return null;
+      }
+
+      const selected = state.nodes.find((n) => n.id === state.selectedNodeId);
+      const anchor = selected?.position ?? {
+        x: 400,
+        y: Math.max(0, ...state.nodes.map((n) => n.position.y)) + 160,
+      };
+      const position = {
+        x: Math.round(anchor.x + (selected ? 40 : 0)),
+        y: Math.round(anchor.y + (selected ? 140 : 0)),
+      };
+
+      const provider = state.providerPrefs.defaultProvider;
+      const data = presetDataToNodeData(preset.kind, preset.data);
+      if (data.model) {
+        data.model = remapModelToProvider(data.model, provider);
+      } else {
+        data.model = defaultModelForProvider(provider);
+      }
+
+      const id = `${preset.kind}-${newId().slice(0, 8)}`;
+      const node: Node<PrismNodeData> = {
+        id,
+        type: preset.kind,
+        position,
+        data,
+      };
+
+      set({
+        nodes: [...state.nodes, node],
+        selectedNodeId: id,
+        dirty: true,
+        lastTalkMutation: {
+          summary: `Placed preset “${preset.name}”. Drag handles to wire it in.`,
+          applied: true,
+        },
+      });
+      return id;
+    },
+
+    deleteNodePreset: (presetId) => {
+      const next = deleteUserPreset(get().nodePresets, presetId);
+      if (!next) {
+        set({
+          lastTalkMutation: {
+            summary: "Built-in presets can’t be deleted.",
+            applied: false,
+          },
+        });
+        return false;
+      }
+      saveNodePresets(next);
+      set({
+        nodePresets: next,
+        lastTalkMutation: {
+          summary: "Removed user preset.",
+          applied: true,
+        },
+      });
+      return true;
+    },
+
     setContextIntakeActive: (open) => set({ contextIntakeActive: open }),
 
     beginContextPass: (kinds) => {
@@ -931,15 +1541,8 @@ export const useGraphStore = create<GraphState>((set, get) => {
         status: "idle",
         notes,
         nodeResults: state.nodes
-          .filter((n) => n.data.kind === "agent" || n.data.kind === "merge")
-          .map((n) => ({
-            nodeId: n.id,
-            label: n.data.label,
-            model: n.data.model,
-            status: n.data.status,
-            output: n.data.output,
-            metrics: n.data.metrics,
-          })),
+          .filter((n) => isExecutableKind(n.data.kind))
+          .map((n, index) => nodeResultFromGraphNode(n, index)),
       };
       const architectures = state.architectures.map((a) =>
         a.id === state.activeId
@@ -949,10 +1552,9 @@ export const useGraphStore = create<GraphState>((set, get) => {
       set({
         architectures,
         selectedRunId: run.id,
-        runsOpen: true,
         dirty: true,
         lastTalkMutation: {
-          summary: "Logged a run checkpoint (execution fills results in Block 3).",
+          summary: "Logged a run checkpoint.",
           applied: true,
         },
       });
@@ -981,7 +1583,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
       copy.attachedContext = [...(current?.attachedContext ?? [])];
       copy.connections = (current?.connections ?? copy.connections).map((c) => ({
         ...c,
-        id: crypto.randomUUID(),
+        id: newId(),
         updatedAt: Date.now(),
       }));
       copy.runs = [];
@@ -1099,6 +1701,29 @@ export const useGraphStore = create<GraphState>((set, get) => {
       return active ? exportDocument(active) : "";
     },
 
+    exportActiveTrace: () => {
+      const state = get();
+      const arch = activeArch(state);
+      if (!arch) return "";
+      const run =
+        arch.runs.find((r) => r.id === state.selectedRunId) ?? arch.runs[0];
+      const live = !run || run.id === state.activeRunId;
+      const trace = live
+        ? buildLiveTrace(arch, run ?? null, state.nodes, state.edges)
+        : buildTrace(arch, run);
+      return JSON.stringify(trace, null, 2);
+    },
+
+    exportActiveTraceJsonl: () => {
+      const raw = get().exportActiveTrace();
+      if (!raw) return "";
+      try {
+        return traceToJsonl(JSON.parse(raw));
+      } catch {
+        return "";
+      }
+    },
+
     importArchitectureJson: (json) => {
       const doc = importDocument(json, get().user);
       if (!doc) {
@@ -1143,6 +1768,174 @@ export const useGraphStore = create<GraphState>((set, get) => {
           summary: "Reset active architecture to starter MoA shape.",
           applied: true,
         },
+      });
+    },
+
+    openStudentTeachers: () => {
+      const user = get().user;
+      let items = (get().hydrated ? flushActive(get) : get().architectures).map(
+        repairEmptyArch,
+      );
+      let existing = items.find((a) => a.templateId === "student-teachers");
+      if (!existing) {
+        const built = getTemplate("student-teachers").build();
+        existing = createDocumentFromGraph({
+          name: built.name,
+          owner: user,
+          prompt: built.prompt,
+          description: built.description,
+          tags: built.tags,
+          templateId: built.templateId,
+          nodes: built.nodes,
+          edges: built.edges,
+        });
+        existing.nodes = pinStudentLabModels(
+          normalizeGraphLayout(normalizeNodes(existing.nodes)),
+        );
+        items = [...items, existing];
+      } else {
+        const repaired = repairEmptyArch(existing);
+        const next = {
+          ...repaired,
+          nodes: pinStudentLabModels(repaired.nodes),
+        };
+        existing = next;
+        items = items.map((a) => (a.id === next.id ? next : a));
+      }
+
+      if (!existing) return;
+
+      if (get().activeId === existing.id && get().nodes.length > 0) {
+        const nodes = pinStudentLabModels(get().nodes);
+        set({
+          nodes,
+          architectures: items,
+          dirty: true,
+          lastTalkMutation: {
+            summary: "Teacher is Claude Opus 5 (OpenRouter).",
+            applied: true,
+          },
+        });
+        saveLibrary({ schemaVersion: 3, activeId: existing.id, items });
+        return;
+      }
+
+      const canvas = loadArchOntoCanvas(existing);
+      set({
+        architectures: items,
+        activeId: existing.id,
+        ...canvas,
+        dirty: false,
+        layoutEpoch: get().layoutEpoch + 1,
+        lastTalkMutation: {
+          summary:
+            "Opened Student vs teachers — Step Hub, then Nemo, then teachers, then Judge.",
+          applied: true,
+        },
+      });
+      saveLibrary({ schemaVersion: 3, activeId: existing.id, items });
+    },
+
+    applyLabSeed: (seed) => {
+      if (!seed?.id || !Array.isArray(seed.nodes) || !seed.nodes.length) return;
+      const items = flushActive(get);
+      const existing = items.find((a) => a.templateId === "student-teachers");
+      if (!existing) return;
+
+      const runId = `lab-${seed.id}`;
+      const prior = existing.runs.find((r) => r.id === runId);
+      if (prior?.finishedAt === seed.finishedAt) return;
+
+      const byId = new Map(seed.nodes.map((n) => [n.id, n]));
+      const baseNodes =
+        get().activeId === existing.id ? get().nodes : existing.nodes;
+      const patched = pinStudentLabModels(baseNodes).map((node) => {
+        const hit = byId.get(node.id);
+        if (!hit) {
+          return node.id === "context"
+            ? { ...node, data: { ...node.data, content: seed.hubContent } }
+            : node;
+        }
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            content:
+              node.id === "context" ? seed.hubContent : node.data.content,
+            output: hit.output,
+            status: hit.status,
+            metrics: hit.metrics,
+          },
+        };
+      });
+      const nodes = backfillIngestOnNodes(
+        patched,
+        existing.edges,
+        seed.prompt,
+        existing.attachedContext ?? [],
+      );
+
+      const run: RunRecord = {
+        id: runId,
+        architectureId: existing.id,
+        prompt: seed.prompt,
+        status: seed.error ? "error" : "done",
+        startedAt: seed.finishedAt,
+        finishedAt: seed.finishedAt,
+        pathwayLabel: "Student vs teachers",
+        notes: seed.error
+          ? `seed ${seed.id}: ${seed.error}`
+          : `seed ${seed.id}`,
+        nodeResults: seed.nodes.map((n, index) => {
+          const graphNode = nodes.find((node) => node.id === n.id);
+          const step = STUDENT_LAB_STEP_ORDER.indexOf(
+            n.id as (typeof STUDENT_LAB_STEP_ORDER)[number],
+          );
+          return {
+            nodeId: n.id,
+            label: n.label,
+            kind: graphNode?.data.kind,
+            role: graphNode?.data.role,
+            model: n.model,
+            status: n.status,
+            output: n.output,
+            metrics: n.metrics,
+            ingest: graphNode?.data.ingest,
+            step: step >= 0 ? step : index,
+          };
+        }),
+      };
+
+      const nextArch: PrismDocument = {
+        ...existing,
+        prompt: seed.prompt,
+        nodes,
+        runs: [run, ...existing.runs.filter((r) => r.id !== runId)],
+        updatedAt: Date.now(),
+      };
+      const nextItems = items.map((a) =>
+        a.id === nextArch.id ? nextArch : a,
+      );
+
+      set({
+        architectures: nextItems,
+        activeId: existing.id,
+        nodes,
+        edges: existing.edges.map((e) => ({ ...e })),
+        selectedRunId: runId,
+        dirty: true,
+        layoutEpoch: get().layoutEpoch + 1,
+        lastTalkMutation: {
+          summary: seed.error
+            ? `Lab run stopped: ${seed.error}`
+            : "Loaded missing-fact #8 — open Nemo, Teacher, and Judge outputs.",
+          applied: !seed.error,
+        },
+      });
+      saveLibrary({
+        schemaVersion: 3,
+        activeId: existing.id,
+        items: nextItems,
       });
     },
 

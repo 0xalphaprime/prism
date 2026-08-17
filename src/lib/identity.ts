@@ -1,3 +1,5 @@
+import { newId } from "./id";
+
 export type PrismUser = {
   id: string;
   name: string;
@@ -9,7 +11,7 @@ const USER_KEY = "prism.user.v1";
 
 export function defaultUser(): PrismUser {
   return {
-    id: crypto.randomUUID(),
+    id: newId(),
     name: "Local builder",
     updatedAt: Date.now(),
   };

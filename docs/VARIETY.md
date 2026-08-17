@@ -12,7 +12,7 @@ This note is a living roadmap for what the lab should offer. It is not a commitm
 | Layer | Variety lever | Absorbs |
 |-------|---------------|---------|
 | Topology | Who connects to whom; hubs; late injects; parallel judges | Problem structure / branching |
-| Roles & Steer | Distinct jobs + proximal constraints | Homogenization / mushy outputs |
+| Roles & Steer | Distinct jobs + proximal constraints; **node presets** | Homogenization / mushy outputs |
 | Models | Heterogeneous `provider:model` | Capability gaps |
 | Context | Channels, slots, inject timing | Missing facts / domain grounding |
 | Runs | Step, checkpoints, sweeps, compare | Uncertainty / experiment noise |
@@ -49,7 +49,7 @@ Anti-pattern: *more of the same* (same model × n, all-to-all noise) pretending 
 
 ## 3. Node attributes (the expand workspace)
 
-**Have now (schema + Expand Controls; Block 3 enforces at run)**
+**Have now (schema + Expand Controls; Step / Run all enforce at run)**
 
 | Attribute | Where | Notes |
 |-----------|--------|------|
@@ -67,6 +67,8 @@ Anti-pattern: *more of the same* (same model × n, all-to-all noise) pretending 
 | **Eval rubric** | Expand Controls (agent/merge) | compare / Judge checklist |
 | **Publish visibility** | Expand Controls (downstream) | includeInSamples / redactOutput |
 | Output / metrics | Expand + output page | Filled in Block 3 |
+
+**Node presets (local).** Save Split / agent / Judge role packs from Expand; place from Add tile. Built-ins: Researcher, Writer, Critic, Summarizer, Red-team, Split (route), Judge (crisp). User presets are deletable. Middle unit between blank tiles and full architecture templates.
 
 **Cut:** separate **input map** UI. Graph edges *are* the input map; default packing = everything upstream. Per-edge filters (titles-only etc.) stay later under Context variety.
 
@@ -91,7 +93,7 @@ Steer stays the *proximal* dial above Controls — don’t bury it.
 
 ## 5. Run variety
 
-**Now:** Log checkpoint (stub). Step / Run all = Block 3.
+**Now:** Step / Run all execute the pathway (intelligent Split + agents + Judge). Log checkpoint still snapshots without running.
 
 **Toolkit to offer**
 
@@ -110,7 +112,7 @@ Every mode should leave **inspectable artifacts** — that *is* the product.
 
 ## 6. Authoring & public-good variety
 
-- Templates (starter MoA, debate, blank)  
+- Templates (starter MoA, debate, blank, **student vs teachers**)  
 - Talk bar mutations  
 - Publish packages (architecture + recipe + sample runs)  
 - Fork lineage (`forkedFrom`)  
@@ -136,10 +138,10 @@ Full notes: [`RESEARCH.md`](../RESEARCH.md).
 
 ## 8. Sequencing (opinionated)
 
-1. **Done / now** — graph CRUD, Expand attributes (budget → publish), Hub + late inject  
-2. **Block 3** — Step / Run all; compose Role+Steer+Prompt+context; enforce budget/sampling/schema/forward  
-3. **Compare runs + publish export UI** — prove and share pathways (rubric + visibility)  
-4. **Edge filters / Route levers** — sparsify *what* travels, then *who* activates  
+1. **Done** — graph CRUD, Expand attributes, Hub + late inject  
+2. **Done (Block 3)** — Step / Run all; intelligent Split route plan; compose Role+Steer+Prompt+context; temp / max tokens / keep-k / schema hint  
+3. **Next** — Compare runs + publish export UI (rubric + visibility)  
+4. **Edge filters / richer Route levers** — sparsify *what* travels; learned activation beyond one plan call  
 5. **Gallery + parallel instances** — public-good scale  
 
 ---

@@ -313,12 +313,32 @@ export async function chatCompletion(args: {
     throw err;
   }
   const choice = (
-    payload as { choices?: Array<{ message?: { content?: string } }> }
+    payload as {
+      choices?: Array<{
+        message?: {
+          content?: string | Array<{ type?: string; text?: string }>;
+          reasoning?: string;
+        };
+      }>;
+    }
   )?.choices?.[0];
+  const message = choice?.message;
+  let content = "";
+  if (typeof message?.content === "string") content = message.content;
+  else if (Array.isArray(message?.content)) {
+    content = message.content
+      .map((part) => (typeof part?.text === "string" ? part.text : ""))
+      .join("");
+  }
+  const reasoning =
+    typeof message?.reasoning === "string" && message.reasoning.trim()
+      ? message.reasoning
+      : undefined;
   return {
     provider: args.provider,
     model: args.model,
-    content: choice?.message?.content ?? "",
+    content,
+    reasoning,
     usage: (payload as { usage?: unknown })?.usage ?? null,
     latencyMs: Date.now() - started,
     raw: payload,

@@ -15,6 +15,20 @@ export type NodeMetrics = {
   costUsd?: number;
 };
 
+/** What actually went to the model — not the tile fields. */
+export type NodeIngest = {
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+  keepK?: number;
+  laneBrief?: string;
+  upstreamIds?: string[];
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+};
+
 /** Per-node spend ceilings — enforced in Block 3 */
 export type NodeBudget = {
   maxTokensOut?: number;
@@ -58,6 +72,10 @@ export type PrismNodeData = {
   model?: ModelRef;
   content?: string;
   output?: string;
+  /** Hidden chain-of-thought when the provider returns it separately */
+  reasoning?: string;
+  /** Assembled request for this step */
+  ingest?: NodeIngest;
   status: RunStatus;
   metrics?: NodeMetrics;
   /** Set on context-source tiles — which channel this upstream node owns */

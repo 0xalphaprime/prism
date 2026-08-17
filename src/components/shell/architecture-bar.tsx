@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
+import type { StudentLabSeed } from "@/lib/student-lab";
 import { TEMPLATES } from "@/lib/templates";
 import { useGraphStore } from "@/store/graph-store";
 
@@ -20,16 +21,70 @@ export function ArchitectureBar() {
   const createFromTemplate = useGraphStore((s) => s.createFromTemplate);
   const duplicateArchitecture = useGraphStore((s) => s.duplicateArchitecture);
   const deleteArchitecture = useGraphStore((s) => s.deleteArchitecture);
-  const setRunsOpen = useGraphStore((s) => s.setRunsOpen);
   const exportActiveArchitecture = useGraphStore((s) => s.exportActiveArchitecture);
   const importArchitectureJson = useGraphStore((s) => s.importArchitectureJson);
   const setArchitectureMeta = useGraphStore((s) => s.setArchitectureMeta);
+  const openStudentTeachers = useGraphStore((s) => s.openStudentTeachers);
+  const applyLabSeed = useGraphStore((s) => s.applyLabSeed);
   const fileRef = useRef<HTMLInputElement>(null);
   const moreRef = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const empty = useGraphStore.getState().nodes.length === 0;
+    let skip = false;
+    try {
+      skip = sessionStorage.getItem("prism-opened-student-lab-v2") === "1";
+    } catch {
+      skip = false;
+    }
+    if (skip && !empty) return;
+    try {
+      sessionStorage.setItem("prism-opened-student-lab-v2", "1");
+    } catch {
+      // still open this mount
+    }
+    openStudentTeachers();
+  }, [hydrated, openStudentTeachers]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    let tries = 0;
+    let timer = 0;
+    let cancelled = false;
+
+    const pull = async () => {
+      try {
+        const res = await fetch("/api/lab/run-student");
+        if (!res.ok) return false;
+        const seed = (await res.json()) as StudentLabSeed;
+        if (!seed?.id || cancelled) return false;
+        applyLabSeed(seed);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    void pull().then((hit) => {
+      if (hit || cancelled) return;
+      timer = window.setInterval(() => {
+        tries += 1;
+        void pull().then((ok) => {
+          if (ok || tries >= 48) window.clearInterval(timer);
+        });
+      }, 5000);
+    });
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+    };
+  }, [hydrated, applyLabSeed]);
 
   useEffect(() => {
     if (!hydrated || !dirty) return;
@@ -98,6 +153,15 @@ export function ArchitectureBar() {
           {dirty ? "Saving…" : "Saved"}
         </span>
 
+        <button
+          type="button"
+          className="btn btn-accent"
+          onClick={openStudentTeachers}
+          title="Open Hub → Nemo + teachers → Judge"
+        >
+          Student vs teachers
+        </button>
+
         <div className="architecture-actions">
           <Link href="/prompt" className="btn btn-accent">
             Prompt
@@ -108,9 +172,9 @@ export function ArchitectureBar() {
           <Link href="/context" className="btn btn-accent">
             Context
           </Link>
-          <button type="button" className="btn" onClick={() => setRunsOpen(true)}>
-            Runs ({active.runs.length})
-          </button>
+          <Link href="/trace" className="btn btn-accent">
+            Trace ({active.runs.length})
+          </Link>
 
           <details ref={moreRef} className="architecture-more">
             <summary className="btn">More</summary>

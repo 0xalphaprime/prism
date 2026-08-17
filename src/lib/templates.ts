@@ -1,5 +1,7 @@
-import { STARTER_EDGES, STARTER_NODES } from "./starter-graph";
 import type { PrismDocument } from "./document";
+import { STARTER_EDGES, STARTER_NODES } from "./starter-graph";
+import { STUDENT_LAB_PROMPT } from "./student-lab";
+import { STUDENT_TEACHER_EDGES, STUDENT_TEACHER_NODES } from "./student-graph";
 
 export type ArchitectureTemplate = {
   id: string;
@@ -105,6 +107,25 @@ export const TEMPLATES: ArchitectureTemplate[] = [
         edges: g.edges.filter((e) => keep.has(e.source) && keep.has(e.target)),
       };
     },
+  },
+  {
+    id: "student-teachers",
+    name: "Student vs teachers",
+    description: "Hub → Nemo (Foundry) + independent teachers → Judge. No Split.",
+    tags: ["student", "foundry", "moa"],
+    build: () => ({
+      name: "Student vs teachers",
+      description: "Nemo attempts first; teachers share Hub only; Judge names characteristics",
+      tags: ["student", "foundry", "moa"],
+      prompt: STUDENT_LAB_PROMPT,
+      templateId: "student-teachers",
+      nodes: STUDENT_TEACHER_NODES.map((n) => ({
+        ...n,
+        data: { ...n.data },
+        position: { ...n.position },
+      })),
+      edges: STUDENT_TEACHER_EDGES.map((e) => ({ ...e })),
+    }),
   },
 ];
 
