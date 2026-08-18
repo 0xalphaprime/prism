@@ -69,7 +69,16 @@ import {
 } from "@/lib/run-graph";
 import { createRunStub, assignResultSteps, nodeResultFromGraphNode, type RunRecord } from "@/lib/runs";
 import { STARTER_EDGES, STARTER_NODES } from "@/lib/starter-graph";
-import { CRITIC_MODEL, JUDGE_MODEL, TEACHER_MODEL } from "@/lib/student-graph";
+import {
+  CRITIC_MODEL,
+  INFORMED_NODE_ID,
+  JUDGE_MODEL,
+  STUDENT_MODEL,
+  STUDENT_NODE_ID,
+  TEACHER_MODEL,
+  ensureInformedStudentHop,
+  studentTeachersNeedsInformedHop,
+} from "@/lib/student-graph";
 import {
   STUDENT_LAB_HUB,
   STUDENT_LAB_PROMPT,
@@ -251,6 +260,9 @@ function pinStudentLabModels(
   nodes: Node<PrismNodeData>[],
 ): Node<PrismNodeData>[] {
   return nodes.map((node) => {
+    if (node.id === STUDENT_NODE_ID || node.id === INFORMED_NODE_ID) {
+      return { ...node, data: { ...node.data, model: STUDENT_MODEL } };
+    }
     if (node.id === "teacher") {
       return { ...node, data: { ...node.data, model: TEACHER_MODEL } };
     }
@@ -267,22 +279,37 @@ function pinStudentLabModels(
 function studentLabModelsNeedPin(nodes: Node<PrismNodeData>[]) {
   return nodes.some(
     (n) =>
+      (n.id === STUDENT_NODE_ID && n.data.model !== STUDENT_MODEL) ||
+      (n.id === INFORMED_NODE_ID && n.data.model !== STUDENT_MODEL) ||
       (n.id === "teacher" && n.data.model !== TEACHER_MODEL) ||
       (n.id === "critique" && n.data.model !== CRITIC_MODEL) ||
       (n.id === "judge" && n.data.model !== JUDGE_MODEL),
   );
 }
 
+function repairStudentTeachersGraph(
+  nodes: Node<PrismNodeData>[],
+  edges: Edge[],
+) {
+  const ensured = ensureInformedStudentHop(nodes, edges);
+  return {
+    nodes: pinStudentLabModels(ensured.nodes),
+    edges: ensured.edges,
+  };
+}
+
 function applyStudentLabPrompts(arch: PrismDocument): PrismDocument {
   if (arch.templateId !== "student-teachers") return arch;
+  const repaired = repairStudentTeachersGraph(arch.nodes, arch.edges);
   return {
     ...arch,
     prompt: STUDENT_LAB_PROMPT,
-    nodes: pinStudentLabModels(arch.nodes).map((node) =>
+    nodes: repaired.nodes.map((node) =>
       node.id === "context"
         ? { ...node, data: { ...node.data, content: STUDENT_LAB_HUB } }
         : node,
     ),
+    edges: repaired.edges,
   };
 }
 
@@ -575,26 +602,60 @@ export const useGraphStore = create<GraphState>((set, get) => {
     hydrate: () => {
       if (get().hydrated) {
         const needsPatch = studentLabModelsNeedPin;
+        const active = activeArch(get());
+        const needsInformed =
+          active?.templateId === "student-teachers" &&
+          studentTeachersNeedsInformedHop(get().nodes, get().edges);
         if (
           !needsPatch(get().nodes) &&
-          !get().architectures.some((a) => needsPatch(a.nodes))
+          !needsInformed &&
+          !get().architectures.some(
+            (a) =>
+              needsPatch(a.nodes) ||
+              (a.templateId === "student-teachers" &&
+                studentTeachersNeedsInformedHop(a.nodes, a.edges)),
+          )
         ) {
           return;
         }
-        const nodes = pinStudentLabModels(get().nodes);
-        const architectures = get().architectures.map((arch) => ({
-          ...arch,
-          nodes: pinStudentLabModels(arch.nodes),
-        }));
+        const architectures = get().architectures.map((arch) => {
+          if (arch.templateId !== "student-teachers") {
+            return { ...arch, nodes: pinStudentLabModels(arch.nodes) };
+          }
+          const repaired = repairStudentTeachersGraph(arch.nodes, arch.edges);
+          return { ...arch, nodes: repaired.nodes, edges: repaired.edges };
+        });
+        const repaired =
+          active?.templateId === "student-teachers"
+            ? repairStudentTeachersGraph(get().nodes, get().edges)
+            : {
+                nodes: pinStudentLabModels(get().nodes),
+                edges: get().edges,
+              };
+        const nodes = needsInformed
+          ? normalizeGraphLayout(repaired.nodes)
+          : repaired.nodes;
         set({
           nodes,
+          edges: repaired.edges,
           architectures,
           dirty: true,
+          layoutEpoch: needsInformed ? get().layoutEpoch + 1 : get().layoutEpoch,
           lastTalkMutation: {
-            summary:
-              "Critic is GPT-5.6 Sol; Judge is Grok 4.6 (OpenRouter).",
+            summary: needsInformed
+              ? "Added Nemo after Judge — full upstream ingest, not the distill row."
+              : "Critic is GPT-5.6 Sol; Judge is Grok 4.6 (OpenRouter).",
             applied: true,
           },
+        });
+        saveLibrary({
+          schemaVersion: 3,
+          activeId: get().activeId,
+          items: architectures.map((arch) =>
+            arch.id === get().activeId
+              ? { ...arch, nodes, edges: repaired.edges }
+              : arch,
+          ),
         });
         return;
       }
@@ -655,7 +716,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
           current.templateId === "student-teachers"
             ? {
                 summary:
-                  "Opened Student vs teachers — Teacher is Opus 5. Step Hub, then Nemo, then teachers, then Judge.",
+                  "Opened Student vs teachers — Teacher is Opus 5. Step Hub, then Nemo, then teachers, then Judge, then Nemo after Judge.",
                 applied: true,
               }
             : null,
@@ -1789,34 +1850,49 @@ export const useGraphStore = create<GraphState>((set, get) => {
           nodes: built.nodes,
           edges: built.edges,
         });
-        existing.nodes = pinStudentLabModels(
-          normalizeGraphLayout(normalizeNodes(existing.nodes)),
-        );
+        {
+          const repaired = repairStudentTeachersGraph(
+            existing.nodes,
+            existing.edges,
+          );
+          existing.nodes = normalizeGraphLayout(normalizeNodes(repaired.nodes));
+          existing.edges = repaired.edges;
+        }
         items = [...items, existing];
       } else {
-        const repaired = repairEmptyArch(existing);
-        const next = {
-          ...repaired,
-          nodes: pinStudentLabModels(repaired.nodes),
-        };
-        existing = next;
-        items = items.map((a) => (a.id === next.id ? next : a));
+        const base = repairEmptyArch(existing);
+        const repaired = repairStudentTeachersGraph(base.nodes, base.edges);
+        existing = { ...base, nodes: repaired.nodes, edges: repaired.edges };
+        items = items.map((a) => (a.id === existing.id ? existing : a));
       }
 
       if (!existing) return;
 
       if (get().activeId === existing.id && get().nodes.length > 0) {
-        const nodes = pinStudentLabModels(get().nodes);
+        const added = studentTeachersNeedsInformedHop(get().nodes, get().edges);
+        const repaired = repairStudentTeachersGraph(get().nodes, get().edges);
+        const nodes = added
+          ? normalizeGraphLayout(repaired.nodes)
+          : repaired.nodes;
+        const nextItems = items.map((a) =>
+          a.id === existing.id
+            ? { ...a, nodes, edges: repaired.edges }
+            : a,
+        );
         set({
           nodes,
-          architectures: items,
+          edges: repaired.edges,
+          architectures: nextItems,
           dirty: true,
+          layoutEpoch: added ? get().layoutEpoch + 1 : get().layoutEpoch,
           lastTalkMutation: {
-            summary: "Teacher is Claude Opus 5 (OpenRouter).",
+            summary: added
+              ? "Added Nemo after Judge — full upstream ingest, not the distill row."
+              : "Teacher is Claude Opus 5 (OpenRouter).",
             applied: true,
           },
         });
-        saveLibrary({ schemaVersion: 3, activeId: existing.id, items });
+        saveLibrary({ schemaVersion: 3, activeId: existing.id, items: nextItems });
         return;
       }
 
@@ -1829,7 +1905,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         layoutEpoch: get().layoutEpoch + 1,
         lastTalkMutation: {
           summary:
-            "Opened Student vs teachers — Step Hub, then Nemo, then teachers, then Judge.",
+            "Opened Student vs teachers — Step Hub, then Nemo, then teachers, then Judge, then Nemo after Judge.",
           applied: true,
         },
       });
@@ -1891,17 +1967,25 @@ export const useGraphStore = create<GraphState>((set, get) => {
           const step = STUDENT_LAB_STEP_ORDER.indexOf(
             n.id as (typeof STUDENT_LAB_STEP_ORDER)[number],
           );
+          const resolvedStep = step >= 0 ? step : index;
+          if (graphNode) {
+            return {
+              ...nodeResultFromGraphNode(graphNode, resolvedStep),
+              label: n.label,
+              model: n.model ?? graphNode.data.model,
+              status: n.status,
+              output: n.output,
+              metrics: n.metrics,
+            };
+          }
           return {
             nodeId: n.id,
             label: n.label,
-            kind: graphNode?.data.kind,
-            role: graphNode?.data.role,
             model: n.model,
             status: n.status,
             output: n.output,
             metrics: n.metrics,
-            ingest: graphNode?.data.ingest,
-            step: step >= 0 ? step : index,
+            step: resolvedStep,
           };
         }),
       };

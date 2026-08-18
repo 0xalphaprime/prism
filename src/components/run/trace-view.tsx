@@ -1,11 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CopyButton } from "@/components/run/copy-button";
-import { TraceCellView } from "@/components/run/trace-cell";
+import { TraceCellView, type TraceDensity } from "@/components/run/trace-cell";
 import { TraceSpineView } from "@/components/run/trace-spine";
-import { buildLiveTrace, buildTrace, slugForTrace, traceToJsonl, traceToPlain } from "@/lib/trace";
+import {
+  attributionToJson,
+  buildAttribution,
+  buildLiveTrace,
+  buildTrace,
+  slugForTrace,
+  traceToCausalJsonl,
+  traceToJsonl,
+  traceToPlain,
+} from "@/lib/trace";
 import { useGraphStore } from "@/store/graph-store";
 
 function formatWhen(ts: number) {
@@ -35,6 +44,7 @@ export function TraceView() {
   const activeRunId = useGraphStore((s) => s.activeRunId);
   const selectRun = useGraphStore((s) => s.selectRun);
   const lastTalkMutation = useGraphStore((s) => s.lastTalkMutation);
+  const [density, setDensity] = useState<TraceDensity>("scan");
 
   const active = useMemo(
     () => architectures.find((a) => a.id === activeId) ?? architectures[0],
@@ -56,6 +66,10 @@ export function TraceView() {
   if (!active || !trace) return null;
 
   const slug = slugForTrace(active.name);
+  const report = traceToPlain(trace);
+  const attribution = buildAttribution(trace);
+  const attributionJson = attributionToJson(attribution);
+  const causal = traceToCausalJsonl(trace);
 
   return (
     <div className="trace-layout">
@@ -63,8 +77,8 @@ export function TraceView() {
         <p className="sheet-kicker">Runs</p>
         <h2>Trace</h2>
         <p className="sheet-help">
-          Graph composes the pathway. This report is the spine plus cells in
-          graph order.
+          Graph composes the pathway. This report is the product: spine, who
+          each hop saw, then cells in graph order.
         </p>
         <ul className="trace-run-list">
           {active.runs.length === 0 ? (
@@ -98,6 +112,10 @@ export function TraceView() {
           <div>
             <p className="sheet-kicker">
               {live ? "Live" : "Snapshot"} · {trace.status}
+              {trace.graphFingerprint
+                ? ` · graph ${trace.graphFingerprint}`
+                : ""}
+              {trace.parentRunId ? ` · parent ${trace.parentRunId}` : ""}
             </p>
             <h1>{active.name}</h1>
             <p className="sheet-help">
@@ -109,40 +127,93 @@ export function TraceView() {
             <TraceSpineView spine={trace.spine} />
           </div>
           <div className="trace-main-actions">
+            <div className="trace-density" role="group" aria-label="Trace density">
+              <button
+                type="button"
+                className={`btn ${density === "scan" ? "btn-accent" : ""}`}
+                onClick={() => setDensity("scan")}
+              >
+                Scan
+              </button>
+              <button
+                type="button"
+                className={`btn ${density === "engineer" ? "btn-accent" : ""}`}
+                onClick={() => setDensity("engineer")}
+              >
+                Engineer
+              </button>
+            </div>
             <CopyButton
               label="Copy all"
-              text={traceToPlain(trace)}
+              text={report}
               className="btn btn-accent"
+              title="Copy the human report"
             />
             <Link href="/" className="btn">
               Back to graph
             </Link>
-            <button
-              type="button"
-              className="btn"
-              onClick={() =>
-                downloadText(
-                  `${slug}.prism.trace.json`,
-                  JSON.stringify(trace, null, 2),
-                  "application/json",
-                )
-              }
-            >
-              Download JSON
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={() =>
-                downloadText(
-                  `${slug}.prism.trace.jsonl`,
-                  traceToJsonl(trace),
-                  "application/x-ndjson",
-                )
-              }
-            >
-              Download JSONL
-            </button>
+            <details className="trace-export">
+              <summary className="btn">Export</summary>
+              <div className="trace-export-menu">
+                <CopyButton
+                  label="Copy agent pack"
+                  text={attributionJson}
+                  title="Copy prism.attribution JSON for another agent"
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    downloadText(
+                      `${slug}.prism.trace.json`,
+                      JSON.stringify(trace, null, 2),
+                      "application/json",
+                    )
+                  }
+                >
+                  Download JSON
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    downloadText(
+                      `${slug}.prism.trace.jsonl`,
+                      traceToJsonl(trace),
+                      "application/x-ndjson",
+                    )
+                  }
+                >
+                  Download JSONL
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    downloadText(
+                      `${slug}.prism.attribution.json`,
+                      attributionJson,
+                      "application/json",
+                    )
+                  }
+                >
+                  Download agent pack
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() =>
+                    downloadText(
+                      `${slug}.prism.causal.jsonl`,
+                      causal || "\n",
+                      "application/x-ndjson",
+                    )
+                  }
+                >
+                  Download causal JSONL
+                </button>
+              </div>
+            </details>
           </div>
         </header>
 
@@ -151,7 +222,12 @@ export function TraceView() {
             <p className="runs-empty">No executable nodes on this graph.</p>
           ) : (
             trace.cells.map((cell, index) => (
-              <TraceCellView key={cell.nodeId} index={index} cell={cell} />
+              <TraceCellView
+                key={cell.nodeId}
+                index={index}
+                cell={cell}
+                density={density}
+              />
             ))
           )}
         </div>
@@ -159,8 +235,9 @@ export function TraceView() {
           <div className="trace-main-actions trace-copy-footer">
             <CopyButton
               label="Copy all"
-              text={traceToPlain(trace)}
+              text={report}
               className="btn btn-accent"
+              title="Copy the human report"
             />
           </div>
         ) : null}

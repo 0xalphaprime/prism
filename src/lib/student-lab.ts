@@ -15,6 +15,7 @@ export const STUDENT_LAB_STEP_ORDER = [
   "teacher",
   "critique",
   "judge",
+  "informed",
 ] as const;
 
 export type StudentLabNodeResult = {

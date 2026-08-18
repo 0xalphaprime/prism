@@ -267,9 +267,18 @@ export async function chatCompletion(args: {
         ?.filter((b) => b.type === "text")
         .map((b) => b.text ?? "")
         .join("") ?? "";
+    const served =
+      typeof (payload as { model?: unknown })?.model === "string"
+        ? ((payload as { model: string }).model)
+        : args.model;
+    const finishReason =
+      typeof (payload as { stop_reason?: unknown })?.stop_reason === "string"
+        ? ((payload as { stop_reason: string }).stop_reason)
+        : undefined;
     return {
       provider: args.provider,
-      model: args.model,
+      model: served,
+      finishReason,
       content,
       usage: (payload as { usage?: unknown })?.usage ?? null,
       latencyMs: Date.now() - started,
@@ -315,6 +324,7 @@ export async function chatCompletion(args: {
   const choice = (
     payload as {
       choices?: Array<{
+        finish_reason?: string;
         message?: {
           content?: string | Array<{ type?: string; text?: string }>;
           reasoning?: string;
@@ -334,9 +344,14 @@ export async function chatCompletion(args: {
     typeof message?.reasoning === "string" && message.reasoning.trim()
       ? message.reasoning
       : undefined;
+  const served =
+    typeof (payload as { model?: unknown })?.model === "string"
+      ? ((payload as { model: string }).model)
+      : args.model;
   return {
     provider: args.provider,
-    model: args.model,
+    model: served,
+    finishReason: choice?.finish_reason,
     content,
     reasoning,
     usage: (payload as { usage?: unknown })?.usage ?? null,

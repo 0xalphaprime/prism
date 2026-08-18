@@ -2500,6 +2500,103 @@ a.btn {
   color: var(--ink-faint);
 }
 
+.trace-spine-jump {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.trace-spine-jump:hover .trace-spine-label {
+  text-decoration: underline;
+}
+
+.trace-density {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.trace-export {
+  position: relative;
+}
+
+.trace-export > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.trace-export > summary::-webkit-details-marker {
+  display: none;
+}
+
+.trace-export-menu {
+  position: absolute;
+  right: 0;
+  z-index: 4;
+  margin-top: 0.3rem;
+  min-width: 12rem;
+  padding: 0.35rem;
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.trace-cell.isolation-fail {
+  border-color: var(--danger);
+}
+
+.trace-cell-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0 0 0.5rem;
+}
+
+.trace-cell-chips:empty {
+  display: none;
+}
+
+.trace-chip {
+  font-size: 0.65rem;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: var(--bg);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trace-chip.is-fail {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.trace-chip.is-warn {
+  color: var(--ink);
+}
+
+.trace-chip.is-keep {
+  color: var(--ok);
+}
+
+.trace-cell-metrics {
+  margin: 0.4rem 0 0;
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+}
+
 .trace-cells {
   display: grid;
   gap: 0.8rem;
@@ -2510,6 +2607,7 @@ a.btn {
   border-radius: 10px;
   background: var(--bg-elevated);
   padding: 0.75rem 0.85rem 0.85rem;
+  scroll-margin-top: 1rem;
 }
 
 .trace-cell.status-running {

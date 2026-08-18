@@ -43,6 +43,10 @@ export function truncateContextText(text: string, cap = CONTEXT_TEXT_CAP) {
   return `${text.slice(0, cap)}\n\n…[truncated ${text.length - cap} chars]`;
 }
 
+export function textLooksTruncated(text: string | undefined): boolean {
+  return Boolean(text && text.includes("…[truncated"));
+}
+
 /** How the upstream tile collects context for this channel */
 export type ContextIntakeMode = "attach" | "urls" | "slash" | "notes" | "folder";
 

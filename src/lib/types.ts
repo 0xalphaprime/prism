@@ -15,6 +15,51 @@ export type NodeMetrics = {
   costUsd?: number;
 };
 
+export type NamedUpstream = {
+  id: string;
+  label: string;
+};
+
+/** Decomposed knobs that produced ingest.messages — not a second prompt. */
+export type NamedIngest = {
+  runIntent?: string;
+  role?: string;
+  steer?: string;
+  nodePrompt?: string;
+  outputSchema?: string;
+  upstream?: NamedUpstream[];
+};
+
+export type IsolationSight = {
+  id: string;
+  label: string;
+};
+
+/** Who this hop actually saw vs the rest of the executable graph. */
+export type IsolationReport = {
+  saw: IsolationSight[];
+  notSaw: IsolationSight[];
+  ok: boolean;
+  forbiddenHits?: string[];
+};
+
+export type JudgeCharacteristics = {
+  keep: string[];
+  omit: string[];
+  neverSay: string[];
+};
+
+export type StoredRouteLane = {
+  nodeId: string;
+  activate: boolean;
+  brief?: string;
+};
+
+export type StoredRoutePlan = {
+  lanes: StoredRouteLane[];
+  rationale?: string;
+};
+
 /** What actually went to the model — not the tile fields. */
 export type NodeIngest = {
   model: string;
@@ -27,6 +72,7 @@ export type NodeIngest = {
     role: "system" | "user" | "assistant";
     content: string;
   }>;
+  named?: NamedIngest;
 };
 
 /** Per-node spend ceilings — enforced in Block 3 */
@@ -76,6 +122,18 @@ export type PrismNodeData = {
   reasoning?: string;
   /** Assembled request for this step */
   ingest?: NodeIngest;
+  namedIngest?: NamedIngest;
+  isolation?: IsolationReport;
+  provider?: string;
+  servedModel?: string;
+  finishReason?: string;
+  startedAt?: number;
+  finishedAt?: number;
+  ingestHash?: string;
+  truncated?: boolean;
+  errorDetail?: string;
+  routePlan?: StoredRoutePlan;
+  characteristics?: JudgeCharacteristics;
   status: RunStatus;
   metrics?: NodeMetrics;
   /** Set on context-source tiles — which channel this upstream node owns */
