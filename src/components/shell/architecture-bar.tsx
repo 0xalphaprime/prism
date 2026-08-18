@@ -157,7 +157,7 @@ export function ArchitectureBar() {
           type="button"
           className="btn btn-accent"
           onClick={openStudentTeachers}
-          title="Open Hub → Nemo + teachers → Judge"
+          title="Open Hub → Nemo + teachers → Judge → second Nemo"
         >
           Student vs teachers
         </button>

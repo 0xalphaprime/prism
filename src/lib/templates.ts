@@ -111,11 +111,13 @@ export const TEMPLATES: ArchitectureTemplate[] = [
   {
     id: "student-teachers",
     name: "Student vs teachers",
-    description: "Hub → Nemo (Foundry) + independent teachers → Judge. No Split.",
+    description:
+      "Hub → Nemo + teachers → Judge → second Nemo (full ingest). No Split.",
     tags: ["student", "foundry", "moa"],
     build: () => ({
       name: "Student vs teachers",
-      description: "Nemo attempts first; teachers share Hub only; Judge names characteristics",
+      description:
+        "Nemo attempts first; teachers share Hub only; Judge names characteristics; second Nemo sees the full pack",
       tags: ["student", "foundry", "moa"],
       prompt: STUDENT_LAB_PROMPT,
       templateId: "student-teachers",

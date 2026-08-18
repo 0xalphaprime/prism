@@ -3,7 +3,7 @@
 **Audience.** Builders using Prism as a mixture-of-agents (MoA) laboratory.  
 **Companion.** Deep paper notes live in [`RESEARCH.md`](../RESEARCH.md). This guide is product-first.  
 **Tagline.** *Only variety can absorb variety.* — W. Ross Ashby  
-**Last updated.** 2026-08-16
+**Last updated.** 2026-08-17
 
 ---
 
@@ -13,7 +13,7 @@
 
 Prism is a visual, no-code **MoA laboratory**. You compose multi-agent pathways as a living graph: bring context in upstream, assign specialists and models to each branch, define variables at every step, then step or run through the system and inspect what each node produces.
 
-The real objective is not a black-box chat. It is to **produce inspectable data and outputs along the way** — sequential, incremental work you can version, compare, and refine. The **graph** is how you compose the pathway. **Trace** (`/trace`) is how you **read the run as an MoA report**: a compact spine of who fed whom, then cells in graph order (full output, ingest, optional reasoning) and JSON / JSONL export.
+The real objective is not a black-box chat. It is to **produce inspectable data and outputs along the way** — sequential, incremental work you can version, compare, and refine. The **graph** is how you compose the pathway. **Trace** (`/trace`) is the early product surface: how you **read the run as an MoA report** (spine, who each hop saw, cells in graph order) and how you **hand the run to another agent or a training loop** (report / attribution pack / causal JSONL). Prism does not train.
 
 The canvas is there so someone can *see*:
 
@@ -60,7 +60,7 @@ Around the graph:
 | **Prompt** (`/prompt`) | Architecture-level *run intent* for the whole pathway |
 | **Context** (`/context`) | Attach and manage payloads for each channel |
 | **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
-| **Trace** (`/trace`) | MoA graph report — spine, cells in graph order, exhaust, Copy all / JSON / JSONL |
+| **Trace** (`/trace`) | Product report — Scan / Engineer, spine jump, who each hop saw, Judge chips, Copy all + export menu |
 | **Talk** | Natural-language edits that land on the same graph |
 
 **Topology note.** Channels default into **Context Hub**, then Split → agents → Judge. You may also drag a channel (or Hub) **directly into a downstream node** for intentional late context inject. See [`VARIETY.md`](VARIETY.md) for the toolkit roadmap.
@@ -188,9 +188,19 @@ Treat the UI as an experiment control panel. Every knob below is a variable you 
 
 - Output text
 - Latency, tokens in/out, estimated cost
-- Run history on **Trace** (**Step / Run all** fill cells live in **graph order**; spine shows who fed whom; **Copy all** for a chat-pasteable dump; download `prism.trace.json` / `.jsonl`)
+- Run history on **Trace** (**Step / Run all** fill cells live in **graph order**; spine shows who fed whom; **Scan** shows output + saw / isolation / finish / Judge chips; **Engineer** opens exhaust: named ingest, hashes, requested vs served model, reasoning). **Copy all** is the human report. **Export** has agent pack (`prism.attribution`) and causal JSONL (`prism.causal`) plus full JSON / JSONL.
 
 **Practice:** when you change variables that matter, **Save**, **Duplicate**, or **Export** the architecture so pathways stay comparable. Checkpoints without topology/prompt snapshots are hard to trust later.
+
+### Trace files
+
+| File | Job |
+|------|-----|
+| **Copy all** / `*.prism.trace.json` | Human report. Named ingest, saw/isolation, output, then reasoning. Lab owner dump. |
+| **Agent pack** `*.prism.attribution.json` | Another agent for feedback. Spine, fingerprint, named ingest, outputs, isolation, Judge chips. No reasoning. |
+| **Causal** `*.prism.causal.jsonl` | Training/eval ingest. One agent/router cell per line: ingest hash, messages, output, served model. Skips isolation fail, student row if any specialist leaked, `includeInSamples === false`, finish `length`, and Judge (`merge`) cells. No reasoning. |
+
+**Isolation** on Trace is “who this hop saw.” Student-vs-teachers adds a gate: Teacher/Critic must not see Nemo. First-pass Nemo is Hub-only. Second-pass Nemo after Judge is supposed to see everyone. Characteristics chips are Judge output — distill those, don’t paste the essay into the isolated student.
 
 ---
 
@@ -206,7 +216,7 @@ Prism is the visualization and control surface for patterns documented in [`RESE
 | **Faster-MoA** | Sparse topology + serving co-design | Later: tree-ish graphs, early exit |
 | **Fan-out / fan-in** (Ganji) | Decompose → parallel → synthesize | Starter MoA template |
 | **Debate / refine** | Opposing specialists or critic loops | Parallel debate template; refine cycles later |
-| **Durable runs + observability** | Checkpoints, traces, $/agent | **Trace** graph report + JSON/JSONL export |
+| **Durable runs + observability** | Checkpoints, traces, $/agent | **Trace** as product: Scan/Engineer + report / attribution / causal export |
 
 ### What we are optimizing for in the lab
 
@@ -230,7 +240,7 @@ Recommended first path:
 4. **Select** a tile → **Expand** (or double-click); fill **Label**, **Role**, **Steer**, **Model**, **Prompt**, and **Controls** as needed. **Open output** for artifacts. **Delete** tiles you no longer want.
 5. **Clean layout** if tiles overlap; **Save architecture**.
 6. **Log checkpoint** if you want a snapshot before executing.
-7. **Step / Run all** — Prism jumps to **Trace**. The header spine is the graph. Cells fill in **graph order** (not who finished first). **Expand exhaust** for role / steer / **ingest** / reasoning / metrics. **Copy all** pastes the report. Download JSON / JSONL to ingest elsewhere. Tile **Expand** / **Open output** remain optional.
+7. **Step / Run all** — Prism jumps to **Trace**. The header spine is the graph (click a line to jump). Cells fill in **graph order** (not who finished first). **Scan** is enough to see output, who the hop **saw**, isolation fail, clipped finish, and Judge keep/omit/never-say chips. **Engineer** opens exhaust (named ingest, hashes, served model, route plan, reasoning). **Copy all** pastes the report. **Export** → agent pack for another chat, causal JSONL for a loop (gates: isolation, `includeInSamples`, finish ≠ length). Tile **Expand** / **Open output** remain optional.
 8. **Duplicate** the architecture to A/B a variable (model, steer, context set) without losing the prior pathway.
 
 ### Student vs teachers (Foundry / Nemo)
@@ -240,8 +250,8 @@ Use this when you want inspectable exhaust for the local student — not a LoRA 
 1. Click **Student vs teachers** on the architecture bar (or **More → Template…**). If the canvas is empty, that button restores the graph.
 2. Connections: OpenRouter as default channel for *new teacher tiles*. Do **not** click **Apply to this graph** if you only meant to remap teachers — Ollama/Nemo is pinned and will stay, but you still don’t need a full remap.
 3. Put one sharp leftover in Hub notes (or keep the seeded missing-fact brief). Architecture **Prompt** is the run intent.
-4. **Step** (or **Run all**) — you land on **Trace**. Spine plus cells: Hub → specialists → Judge. First pass: Step, not Run all. Copy all / JSONL if you want the branch in an eval pack.
-5. Distill target is a **characteristic card** from Judge (keep / omit / never say) → Foundry `SYSTEM.md`, then `run_eval.py --think`. Do **not** train on Judge dumps.
+4. **Step** (or **Run all**) — you land on **Trace**. Spine plus cells: Hub → specialists → Judge → **Nemo after Judge**. First pass: Step, not Run all. Teacher/Critic **must not** list Nemo in **saw** — isolation fail skips the student causal row. Second-pass Nemo **should** list Hub, first Nemo, teachers, and Judge — that hop is the “can it answer better with the pack?” check.
+5. Distill target is Judge **keep / omit / never-say** chips (and the JSON trailer), not the essay → Foundry `SYSTEM.md`, then `run_eval.py --think`. Do **not** paste Judge prose into the *isolated* student prompt. Causal pack is Hub+intent → first Nemo when isolation holds. **Nemo after Judge** is `includeInSamples: false` — it may ingest the Judge card; it is not the SFT row.
 
 Nemo talks to Foundry via `OLLAMA_BASE_URL` (`http://100.78.81.94:11434/v1`). If Verify shows Ollama down, the student node errors loudly; teachers can still run.
 
@@ -262,7 +272,7 @@ Fork → fill context slots → re-run → compare. Hosted runs (later) can debi
 
 | Horizon | What ships |
 |---------|------------|
-| **Now** | Graph chrome, **Trace** graph report (spine + cells) + JSON/JSONL, Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
+| **Now** | Graph chrome, **Trace** as product (Scan/Engineer, isolation, Judge chips, report / attribution / causal export), Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
 | **Next** | Compare runs UI; publish export; tighter keep‑k / consensus; tools allowlist at run time |
 | **Later** | Gallery / fork; optional account balance for hosted inference; **many parallel instances** of one pathway for extreme sweeps |
 
@@ -279,6 +289,8 @@ The extreme end-state: define a pathway once, fan many instances with controlled
 - Changing models/steers without Save / Duplicate / checkpoint
 - Rank-only fusion with no synthesizer (MoA literature favors synthesize over pick-best)
 - Treating Prism as a single chat transcript instead of a pathway of artifacts
+- Treating Prism as a trainer (Foundry fits; Trace exports the file)
+- Pasting Judge essays into the isolated student prompt (second-pass Nemo may *see* the card; it is not the causal row)
 
 ---
 
@@ -294,7 +306,7 @@ The extreme end-state: define a pathway once, fan many instances with controlled
 | Prompt (architecture bar) | Architecture run intent |
 | Clean layout | Re-spread vertical MoA spine |
 | Log checkpoint | Run history stub |
-| Trace (`/trace`) | MoA graph report: spine + cells; JSON / JSONL export |
+| Trace (`/trace`) | Product report: Scan/Engineer, saw/isolation, Judge chips; Copy all + attribution + causal |
 | More → Template / Export / … | Architecture library ops |
 
 ---

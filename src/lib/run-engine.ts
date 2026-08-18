@@ -4,10 +4,17 @@ import {
   chatBodyForNode,
   composeMessages,
   estimateCostUsd,
+  parseCharacteristics,
   parseRoutePlan,
   usageFromChatPayload,
 } from "@/lib/compose-messages";
-import type { AttachedContext } from "@/lib/context-sources";
+import {
+  textLooksTruncated,
+  type AttachedContext,
+} from "@/lib/context-sources";
+import { hashJson } from "@/lib/hash";
+import { isolationReport } from "@/lib/isolation";
+import { parseModelRef } from "@/lib/providers";
 import {
   activatedAgentIds,
   childAgents,
@@ -17,7 +24,12 @@ import {
   resolveKeepK,
   type RoutePlan,
 } from "@/lib/run-graph";
-import type { NodeMetrics, NodeIngest, PrismNodeData } from "@/lib/types";
+import type {
+  NamedIngest,
+  NodeIngest,
+  NodeMetrics,
+  PrismNodeData,
+} from "@/lib/types";
 
 export type NodeStepResult = {
   nodeId: string;
@@ -35,6 +47,7 @@ type ChatApiOk = {
   latencyMs?: number;
   model?: string;
   provider?: string;
+  finishReason?: string;
 };
 
 export type ChatFn = (
@@ -92,6 +105,70 @@ function metricsFromChat(
   return metrics;
 }
 
+function namedIngestFor(
+  node: Node<PrismNodeData>,
+  architecturePrompt: string,
+  upstream: Array<{ sourceNodeId: string; label: string }>,
+): NamedIngest {
+  return {
+    runIntent: architecturePrompt.trim() || undefined,
+    role: node.data.role?.trim() || undefined,
+    steer: node.data.steer?.trim() || undefined,
+    nodePrompt: node.data.prompt?.trim() || undefined,
+    outputSchema: node.data.outputSchema?.trim() || undefined,
+    upstream: upstream
+      .filter((c) => !c.sourceNodeId.startsWith("__"))
+      .map((c) => ({ id: c.sourceNodeId, label: c.label })),
+  };
+}
+
+function namedFromIds(
+  node: Node<PrismNodeData>,
+  nodes: Node<PrismNodeData>[],
+  architecturePrompt: string,
+  upstreamIds: string[] | undefined,
+): NamedIngest {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  return namedIngestFor(
+    node,
+    architecturePrompt,
+    (upstreamIds ?? [])
+      .filter((id) => !id.startsWith("__"))
+      .map((id) => ({
+        sourceNodeId: id,
+        label: byId.get(id)?.data.label ?? id,
+      })),
+  );
+}
+
+function ingestLooksTruncated(ingest: NodeIngest | undefined, extra?: string) {
+  if (textLooksTruncated(extra)) return true;
+  if (!ingest) return false;
+  return ingest.messages.some((m) => textLooksTruncated(m.content));
+}
+
+function stampIngest(args: {
+  node: Node<PrismNodeData>;
+  nodes: Node<PrismNodeData>[];
+  ingest: NodeIngest;
+}): Pick<
+  PrismNodeData,
+  "ingest" | "namedIngest" | "isolation" | "ingestHash" | "truncated"
+> {
+  const { node, nodes, ingest } = args;
+  return {
+    ingest,
+    namedIngest: ingest.named,
+    isolation: isolationReport({
+      nodeId: node.id,
+      nodes,
+      upstreamIds: ingest.upstreamIds,
+    }),
+    ingestHash: hashJson(ingest.messages),
+    truncated: ingestLooksTruncated(ingest),
+  };
+}
+
 function buildNodeIngest(args: {
   node: Node<PrismNodeData>;
   nodes: Node<PrismNodeData>[];
@@ -124,6 +201,7 @@ function buildNodeIngest(args: {
     })),
   });
   const body = chatBodyForNode(node, messages);
+  const named = namedIngestFor(node, architecturePrompt, upstream);
   return {
     model: body.model,
     temperature: body.temperature,
@@ -132,6 +210,7 @@ function buildNodeIngest(args: {
     laneBrief,
     upstreamIds: upstream.map((c) => c.sourceNodeId),
     messages,
+    named,
   };
 }
 
@@ -143,19 +222,46 @@ export function backfillIngestOnNodes(
   attachedContext: AttachedContext[] = [],
 ): Node<PrismNodeData>[] {
   return nodes.map((node) => {
-    if (node.data.ingest) return node;
+    if (node.data.kind === "context" || node.data.kind === "context-source") {
+      if (node.data.isolation && node.data.truncated !== undefined) return node;
+      const output =
+        node.data.output ?? packNodeLocalOutput(node, attachedContext);
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          truncated: node.data.truncated ?? textLooksTruncated(output),
+          isolation:
+            node.data.isolation ??
+            isolationReport({ nodeId: node.id, nodes, upstreamIds: [] }),
+        },
+      };
+    }
     if (node.data.kind !== "router" && node.data.kind !== "agent" && node.data.kind !== "merge") {
       return node;
     }
-    const ingest = buildNodeIngest({
-      node,
-      nodes,
-      edges,
-      attachedContext,
-      architecturePrompt,
-      activeRoutePlan: null,
-    });
-    return ingest ? { ...node, data: { ...node.data, ingest } } : node;
+    const ingest =
+      node.data.ingest ??
+      buildNodeIngest({
+        node,
+        nodes,
+        edges,
+        attachedContext,
+        architecturePrompt,
+        activeRoutePlan: null,
+      });
+    if (!ingest) return node;
+    const needsStamp =
+      !node.data.namedIngest || !node.data.isolation || !node.data.ingestHash;
+    if (node.data.ingest && !needsStamp) return node;
+    const named =
+      ingest.named ??
+      namedFromIds(node, nodes, architecturePrompt, ingest.upstreamIds);
+    const filled: NodeIngest = { ...ingest, named };
+    return {
+      ...node,
+      data: { ...node.data, ...stampIngest({ node, nodes, ingest: filled }) },
+    };
   });
 }
 
@@ -191,13 +297,27 @@ export async function executeNodeStep(args: {
   }
 
   const kind = node.data.kind;
+  const startedAt = Date.now();
 
   // Pack-only steps
   if (kind === "context-source" || kind === "context") {
     const output = packNodeLocalOutput(node, attachedContext);
+    const finishedAt = Date.now();
     return {
       nodeId,
-      patch: { status: "done", output, metrics: undefined },
+      patch: {
+        status: "done",
+        output,
+        metrics: undefined,
+        startedAt,
+        finishedAt,
+        truncated: textLooksTruncated(output),
+        isolation: isolationReport({
+          nodeId,
+          nodes,
+          upstreamIds: [],
+        }),
+      },
       sidePatches: [],
     };
   }
@@ -208,6 +328,8 @@ export async function executeNodeStep(args: {
       patch: {
         status: "done",
         output: `(skipped unsupported kind: ${kind})`,
+        startedAt,
+        finishedAt: Date.now(),
       },
       sidePatches: [],
     };
@@ -227,13 +349,19 @@ export async function executeNodeStep(args: {
       patch: {
         status: "error",
         output: "Could not assemble ingest for this node",
+        startedAt,
+        finishedAt: Date.now(),
+        errorDetail: "Missing ingest",
       },
       sidePatches: [],
       error: "Missing ingest",
     };
   }
+  const stamped = stampIngest({ node, nodes, ingest });
   const body = chatBodyForNode(node, ingest.messages);
+  const requestedProvider = parseModelRef(body.model)?.provider;
   const result = await callChat(body, chat);
+  const finishedAt = Date.now();
 
   if (!result.ok) {
     return {
@@ -241,7 +369,11 @@ export async function executeNodeStep(args: {
       patch: {
         status: "error",
         output: `Error: ${result.error}`,
-        ingest,
+        ...stamped,
+        provider: requestedProvider,
+        startedAt,
+        finishedAt,
+        errorDetail: result.error,
       },
       sidePatches: [],
       error: result.error,
@@ -251,6 +383,14 @@ export async function executeNodeStep(args: {
   const content = (result.data.content ?? "").trim() || "(empty model response)";
   const reasoning = result.data.reasoning?.trim() || undefined;
   const metrics = metricsFromChat(result.data, body.model);
+  const callMeta: Partial<PrismNodeData> = {
+    ...stamped,
+    provider: result.data.provider ?? requestedProvider,
+    servedModel: result.data.model,
+    finishReason: result.data.finishReason,
+    startedAt,
+    finishedAt,
+  };
 
   if (kind === "router") {
     const children = childAgents(nodeId, nodes, edges);
@@ -269,20 +409,39 @@ export async function executeNodeStep(args: {
             plan?.rationale ? ` Rationale: ${plan.rationale}` : ""
           }`,
           metrics: undefined,
+          startedAt,
+          finishedAt,
         },
       }));
 
     return {
       nodeId,
-      patch: { status: "done", output: content, reasoning, metrics, ingest },
+      patch: {
+        status: "done",
+        output: content,
+        reasoning,
+        metrics,
+        routePlan: plan ?? undefined,
+        ...callMeta,
+      },
       sidePatches,
       routePlan: plan,
     };
   }
 
+  const characteristics =
+    kind === "merge" ? parseCharacteristics(content) ?? undefined : undefined;
+
   return {
     nodeId,
-    patch: { status: "done", output: content, reasoning, metrics, ingest },
+    patch: {
+      status: "done",
+      output: content,
+      reasoning,
+      metrics,
+      characteristics,
+      ...callMeta,
+    },
     sidePatches: [],
   };
 }

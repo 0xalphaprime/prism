@@ -1,10 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CopyButton } from "@/components/run/copy-button";
 import { modelLabel } from "@/lib/providers";
-import type { TraceCell } from "@/lib/trace";
+import {
+  cellToPlain,
+  isLengthClip,
+  traceCellDomId,
+  type TraceCell,
+} from "@/lib/trace";
+
+export type TraceDensity = "scan" | "engineer";
 
 function metricsLine(cell: TraceCell) {
   const m = cell.metrics;
@@ -22,14 +29,29 @@ function metricsLine(cell: TraceCell) {
   return line;
 }
 
+function modelLine(cell: TraceCell) {
+  const requested = cell.model ? modelLabel(String(cell.model)) : "";
+  const served = cell.servedModel?.trim();
+  if (served && requested && served !== requested && !requested.includes(served)) {
+    return `${requested} → ${served}`;
+  }
+  return served || requested || "";
+}
+
 export function TraceCellView({
   cell,
   index,
+  density,
 }: {
   cell: TraceCell;
   index: number;
+  density: TraceDensity;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(density === "engineer");
+  useEffect(() => {
+    setOpen(density === "engineer");
+  }, [density]);
+
   const waiting = cell.status === "idle" || cell.status === "ready";
   const body =
     cell.status === "running"
@@ -38,8 +60,20 @@ export function TraceCellView({
         ? "(waiting)"
         : cell.output?.trim() || "(empty)";
 
+  const named = cell.namedIngest ?? cell.ingest?.named;
+  const fail = cell.isolation?.ok === false;
+  const finishWarn =
+    cell.finishReason &&
+    (isLengthClip(cell.finishReason) ||
+      (cell.finishReason !== "stop" &&
+        cell.finishReason !== "end_turn" &&
+        cell.finishReason !== "eos"));
+
   return (
-    <article className={`trace-cell status-${cell.status}`}>
+    <article
+      id={traceCellDomId(cell.nodeId)}
+      className={`trace-cell status-${cell.status}${fail ? " isolation-fail" : ""}`}
+    >
       <header className="trace-cell-head">
         <div className="trace-cell-identity">
           <span className="trace-cell-step">{index + 1}</span>
@@ -47,7 +81,7 @@ export function TraceCellView({
             <h3>{cell.label}</h3>
             <p className="trace-cell-meta">
               {cell.kind}
-              {cell.model ? ` · ${modelLabel(String(cell.model))}` : ""}
+              {modelLine(cell) ? ` · ${modelLine(cell)}` : ""}
             </p>
           </div>
         </div>
@@ -56,7 +90,43 @@ export function TraceCellView({
         </span>
       </header>
 
+      <div className="trace-cell-chips">
+        {cell.isolation?.saw.length ? (
+          <span className="trace-chip">
+            saw: {cell.isolation.saw.map((s) => s.label).join(", ")}
+          </span>
+        ) : cell.isolation ? (
+          <span className="trace-chip">saw: (none)</span>
+        ) : null}
+        {fail ? (
+          <span className="trace-chip is-fail">isolation fail</span>
+        ) : null}
+        {cell.truncated ? (
+          <span className="trace-chip is-warn">truncated pack</span>
+        ) : null}
+        {finishWarn ? (
+          <span className="trace-chip is-warn">finish: {cell.finishReason}</span>
+        ) : null}
+        {cell.characteristics?.keep.map((item) => (
+          <span key={`keep-${item}`} className="trace-chip is-keep">
+            keep: {item}
+          </span>
+        ))}
+        {cell.characteristics?.omit.map((item) => (
+          <span key={`omit-${item}`} className="trace-chip">
+            omit: {item}
+          </span>
+        ))}
+        {cell.characteristics?.neverSay.map((item) => (
+          <span key={`never-${item}`} className="trace-chip is-fail">
+            never-say: {item}
+          </span>
+        ))}
+      </div>
+
       <pre className="trace-cell-output">{body}</pre>
+
+      <p className="trace-cell-metrics">{metricsLine(cell)}</p>
 
       <div className="trace-cell-actions">
         <button
@@ -67,8 +137,17 @@ export function TraceCellView({
           {open ? "Hide exhaust" : "Expand exhaust"}
         </button>
         {cell.output?.trim() ? (
-          <CopyButton label="Copy output" text={cell.output} />
+          <CopyButton
+            label="Copy output"
+            text={cell.output}
+            title="Copy this cell’s output"
+          />
         ) : null}
+        <CopyButton
+          label="Copy cell"
+          text={cellToPlain(cell, index)}
+          title="Copy this hop as attribution text"
+        />
         <Link href={`/node/${cell.nodeId}`} className="btn">
           Expand tile
         </Link>
@@ -83,39 +162,123 @@ export function TraceCellView({
         <dl className="trace-exhaust">
           <div>
             <dt>Role</dt>
-            <dd>{cell.role?.trim() || "—"}</dd>
+            <dd>{cell.role?.trim() || named?.role || "—"}</dd>
           </div>
           <div>
             <dt>Steer</dt>
-            <dd>{cell.steer?.trim() || "—"}</dd>
+            <dd>{cell.steer?.trim() || named?.steer || "—"}</dd>
           </div>
           <div>
             <dt>Node prompt</dt>
-            <dd>{cell.nodePrompt?.trim() || "—"}</dd>
+            <dd>{cell.nodePrompt?.trim() || named?.nodePrompt || "—"}</dd>
           </div>
+          {named?.runIntent ? (
+            <div>
+              <dt>Run intent</dt>
+              <dd>{named.runIntent}</dd>
+            </div>
+          ) : null}
+          {named?.outputSchema ? (
+            <div>
+              <dt>Output schema</dt>
+              <dd>{named.outputSchema}</dd>
+            </div>
+          ) : null}
           <div>
-            <dt>Model</dt>
+            <dt>Requested model</dt>
             <dd>{cell.model ? modelLabel(String(cell.model)) : "—"}</dd>
           </div>
+          <div>
+            <dt>Served model</dt>
+            <dd>{cell.servedModel || "—"}</dd>
+          </div>
+          {cell.provider ? (
+            <div>
+              <dt>Provider</dt>
+              <dd>{cell.provider}</dd>
+            </div>
+          ) : null}
+          {cell.finishReason ? (
+            <div>
+              <dt>Finish</dt>
+              <dd>{cell.finishReason}</dd>
+            </div>
+          ) : null}
           <div>
             <dt>Metrics</dt>
             <dd>{metricsLine(cell)}</dd>
           </div>
+          {cell.ingestHash ? (
+            <div>
+              <dt>Ingest hash</dt>
+              <dd>{cell.ingestHash}</dd>
+            </div>
+          ) : null}
+          {cell.startedAt ? (
+            <div>
+              <dt>Call clock</dt>
+              <dd>
+                {new Date(cell.startedAt).toLocaleString()}
+                {cell.finishedAt
+                  ? ` → ${new Date(cell.finishedAt).toLocaleString()}`
+                  : ""}
+              </dd>
+            </div>
+          ) : null}
           {typeof cell.step === "number" && cell.step !== index ? (
             <div>
               <dt>Completed</dt>
               <dd>finished as step {cell.step + 1}</dd>
             </div>
           ) : null}
+          {cell.isolation ? (
+            <div>
+              <dt>Saw</dt>
+              <dd>
+                {cell.isolation.saw.length
+                  ? cell.isolation.saw.map((s) => s.label).join(", ")
+                  : "(none)"}
+              </dd>
+            </div>
+          ) : null}
+          {cell.isolation?.notSaw.length ? (
+            <div>
+              <dt>Not on this cell</dt>
+              <dd>{cell.isolation.notSaw.map((s) => s.label).join(", ")}</dd>
+            </div>
+          ) : null}
+          {named?.upstream?.length ? (
+            <div>
+              <dt>Named upstream</dt>
+              <dd>
+                {named.upstream.map((u) => `${u.label} (${u.id})`).join(", ")}
+              </dd>
+            </div>
+          ) : null}
+          {cell.routePlan?.lanes.length ? (
+            <div>
+              <dt>Route plan</dt>
+              <dd>
+                {cell.routePlan.lanes
+                  .map(
+                    (lane) =>
+                      `${lane.nodeId}: ${lane.activate ? "on" : "off"}${
+                        lane.brief ? ` — ${lane.brief}` : ""
+                      }`,
+                  )
+                  .join("\n")}
+                {cell.routePlan.rationale
+                  ? `\n${cell.routePlan.rationale}`
+                  : ""}
+              </dd>
+            </div>
+          ) : null}
           {cell.ingest ? (
             <div>
               <dt>
-                Ingest
+                Ingest messages
                 {cell.ingest.temperature != null
                   ? ` · temp ${cell.ingest.temperature}`
-                  : ""}
-                {cell.ingest.upstreamIds?.length
-                  ? ` · up ${cell.ingest.upstreamIds.join(", ")}`
                   : ""}
               </dt>
               <dd>
@@ -134,6 +297,12 @@ export function TraceCellView({
               <dd>
                 <pre className="trace-ingest-msg">{cell.reasoning}</pre>
               </dd>
+            </div>
+          ) : null}
+          {cell.errorDetail ? (
+            <div>
+              <dt>Error</dt>
+              <dd>{cell.errorDetail}</dd>
             </div>
           ) : null}
         </dl>

@@ -1,8 +1,18 @@
 import { newId } from "./id";
 import type { ModelRef } from "./providers";
-import type { NodeKind, NodeIngest, NodeMetrics, RunStatus } from "./types";
 import type { Node } from "@xyflow/react";
-import type { PrismNodeData } from "./types";
+import type {
+  IsolationReport,
+  JudgeCharacteristics,
+  NamedIngest,
+  NodeIngest,
+  NodeKind,
+  NodeMetrics,
+  NodePublish,
+  PrismNodeData,
+  RunStatus,
+  StoredRoutePlan,
+} from "./types";
 
 export type NodeResult = {
   nodeId: string;
@@ -14,10 +24,62 @@ export type NodeResult = {
   output?: string;
   reasoning?: string;
   ingest?: NodeIngest;
+  namedIngest?: NamedIngest;
+  isolation?: IsolationReport;
   metrics?: NodeMetrics;
+  provider?: string;
+  servedModel?: string;
+  finishReason?: string;
+  startedAt?: number;
+  finishedAt?: number;
+  ingestHash?: string;
+  truncated?: boolean;
+  errorDetail?: string;
+  routePlan?: StoredRoutePlan;
+  characteristics?: JudgeCharacteristics;
+  publish?: NodePublish;
   /** 0-based completion order; missing on older runs */
   step?: number;
 };
+
+function callMetaFromNode(node: Node<PrismNodeData>): Partial<NodeResult> {
+  const d = node.data;
+  return {
+    namedIngest: d.namedIngest ?? d.ingest?.named,
+    isolation: d.isolation,
+    provider: d.provider,
+    servedModel: d.servedModel,
+    finishReason: d.finishReason,
+    startedAt: d.startedAt,
+    finishedAt: d.finishedAt,
+    ingestHash: d.ingestHash,
+    truncated: d.truncated,
+    errorDetail: d.errorDetail,
+    routePlan: d.routePlan,
+    characteristics: d.characteristics,
+    publish: d.publish,
+  };
+}
+
+export function nodeResultFromGraphNode(
+  node: Node<PrismNodeData>,
+  step?: number,
+): NodeResult {
+  return {
+    nodeId: node.id,
+    label: node.data.label,
+    kind: node.data.kind,
+    role: node.data.role,
+    model: node.data.model,
+    status: node.data.status,
+    output: node.data.output,
+    reasoning: node.data.reasoning,
+    ingest: node.data.ingest,
+    metrics: node.data.metrics,
+    ...callMetaFromNode(node),
+    ...(step != null ? { step } : {}),
+  };
+}
 
 /**
  * A single execution of an architecture.
@@ -47,27 +109,12 @@ export type RunRecord = {
   notes?: string;
 };
 
-export function nodeResultFromGraphNode(
-  node: Node<PrismNodeData>,
-  step?: number,
-): NodeResult {
-  return {
-    nodeId: node.id,
-    label: node.data.label,
-    kind: node.data.kind,
-    role: node.data.role,
-    model: node.data.model,
-    status: node.data.status,
-    output: node.data.output,
-    reasoning: node.data.reasoning,
-    ingest: node.data.ingest,
-    metrics: node.data.metrics,
-    ...(step != null ? { step } : {}),
-  };
-}
-
 function isTerminal(status: RunStatus | undefined) {
   return status === "done" || status === "error";
+}
+
+function keep<T>(next: T | undefined, prev: T | undefined): T | undefined {
+  return next !== undefined ? next : prev;
 }
 
 /** Keep existing step numbers; assign the next index when a node first finishes. */
@@ -85,8 +132,21 @@ export function assignResultSteps(
     const old = prevById.get(row.nodeId);
     const merged: NodeResult = {
       ...row,
-      ingest: row.ingest ?? old?.ingest,
-      reasoning: row.reasoning ?? old?.reasoning,
+      ingest: keep(row.ingest, old?.ingest),
+      namedIngest: keep(row.namedIngest, old?.namedIngest),
+      isolation: keep(row.isolation, old?.isolation),
+      reasoning: keep(row.reasoning, old?.reasoning),
+      provider: keep(row.provider, old?.provider),
+      servedModel: keep(row.servedModel, old?.servedModel),
+      finishReason: keep(row.finishReason, old?.finishReason),
+      startedAt: keep(row.startedAt, old?.startedAt),
+      finishedAt: keep(row.finishedAt, old?.finishedAt),
+      ingestHash: keep(row.ingestHash, old?.ingestHash),
+      truncated: keep(row.truncated, old?.truncated),
+      errorDetail: keep(row.errorDetail, old?.errorDetail),
+      routePlan: keep(row.routePlan, old?.routePlan),
+      characteristics: keep(row.characteristics, old?.characteristics),
+      publish: keep(row.publish, old?.publish),
     };
     if (typeof old?.step === "number") return { ...merged, step: old.step };
     const newlyDone = isTerminal(row.status) && !isTerminal(old?.status);

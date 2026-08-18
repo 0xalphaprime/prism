@@ -1,6 +1,6 @@
 import type { Node } from "@xyflow/react";
 import type { UpstreamChunk, RoutePlan, RouteLane } from "@/lib/run-graph";
-import type { PrismNodeData } from "@/lib/types";
+import type { JudgeCharacteristics, PrismNodeData } from "@/lib/types";
 import { normalizeModelRef } from "@/lib/providers";
 
 /** Mirrors server ChatMessage — kept client-safe (no server import). */
@@ -74,6 +74,16 @@ function userForAgentOrMerge(args: ComposeArgs): string {
   return sections.join("\n");
 }
 
+const CHARACTERISTICS_TRAILER = `## Characteristics JSON (in addition to your prose)
+
+End with a fenced json block. Do not replace the written card. Empty arrays are fine.
+
+\`\`\`json
+{"keep":["..."],"omit":["..."],"neverSay":["..."]}
+\`\`\`
+
+keep = what to preserve. omit = what not to distill. neverSay = forbidden phrases / leaks.`;
+
 function userForRouter(args: ComposeArgs): string {
   const { architecturePrompt, node, upstream, childAgents = [] } = args;
   const roster =
@@ -114,8 +124,11 @@ function userForRouter(args: ComposeArgs): string {
 export function composeMessages(args: ComposeArgs): ChatMessage[] {
   const kind = args.node.data.kind;
   const system = systemFor(args.node.data);
-  const user =
+  let user =
     kind === "router" ? userForRouter(args) : userForAgentOrMerge(args);
+  if (kind === "merge") {
+    user = `${user}\n\n${CHARACTERISTICS_TRAILER}`;
+  }
   return [
     { role: "system", content: system },
     { role: "user", content: user },
@@ -196,14 +209,45 @@ export function parseRoutePlan(
   }
 }
 
-function extractJsonObject(raw: string): string | null {
+export function extractJsonObject(raw: string): string | null {
   const trimmed = raw.trim();
-  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = (fenced?.[1] ?? trimmed).trim();
+  const fences = [...trimmed.matchAll(/```(?:json)?\s*([\s\S]*?)```/gi)];
+  const fromFence = fences.length
+    ? fences[fences.length - 1][1]?.trim()
+    : undefined;
+  const candidate = (fromFence ?? trimmed).trim();
   const start = candidate.indexOf("{");
   const end = candidate.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
   return candidate.slice(start, end + 1);
+}
+
+function stringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : String(item).trim()))
+      .filter((item) => item && item !== "...");
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+/** Lenient parse of Judge keep / omit / never-say JSON. */
+export function parseCharacteristics(raw: string): JudgeCharacteristics | null {
+  const jsonText = extractJsonObject(raw);
+  if (!jsonText) return null;
+  try {
+    const parsed = JSON.parse(jsonText) as Record<string, unknown>;
+    const keep = stringList(parsed.keep);
+    const omit = stringList(parsed.omit);
+    const neverSay = stringList(
+      parsed.neverSay ?? parsed.never_say ?? parsed["never-say"],
+    );
+    if (!keep.length && !omit.length && !neverSay.length) return null;
+    return { keep, omit, neverSay };
+  } catch {
+    return null;
+  }
 }
 
 /** Rough $/1k token heuristic for metrics display — not billing-grade. */

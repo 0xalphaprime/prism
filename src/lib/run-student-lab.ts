@@ -49,7 +49,7 @@ const serverChat: ChatFn = async (body) => {
   }
 };
 
-/** Hub → Nemo → Teacher (Opus 5) → Critic → Judge. Teachers never see Nemo. */
+/** Hub → Nemo → Teacher (Opus 5) → Critic → Judge → second Nemo. Teachers never see Nemo. */
 export async function runStudentLab(): Promise<StudentLabSeed> {
   let nodes: Node<PrismNodeData>[] = STUDENT_TEACHER_NODES.map((n) => ({
     ...n,

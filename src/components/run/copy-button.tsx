@@ -7,10 +7,12 @@ export function CopyButton({
   label,
   text,
   className = "btn",
+  title,
 }: {
   label: string;
   text: string;
   className?: string;
+  title?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -18,7 +20,7 @@ export function CopyButton({
     <button
       type="button"
       className={className}
-      title="Copy the full notebook as readable text"
+      title={title ?? "Copy the full notebook as readable text"}
       onClick={async () => {
         const ok = await writeClipboard(text);
         if (!ok) {

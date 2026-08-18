@@ -1,4 +1,5 @@
 import type { Node } from "@xyflow/react";
+import { INFORMED_NODE_ID } from "./student-graph";
 import type { PrismNodeData } from "./types";
 
 /** Approximate rendered heights — used so rows don't collide when zoomed. */
@@ -42,7 +43,7 @@ function placeRow(
 
 /**
  * Clean top→bottom Prism layout:
- * channels (row) → Context Hub → Split → agents (row) → Judge
+ * channels (row) → Context Hub → Split → agents (row) → Judge → post-Judge hops
  */
 export function layoutPrismFlow(
   nodes: Node<PrismNodeData>[],
@@ -63,7 +64,9 @@ export function layoutPrismFlow(
 
   // Stable, readable order for specialist lanes
   const agentOrder = ["student", "research", "draft", "teacher", "critique", "summarizer"];
-  agents.sort((a, b) => {
+  const preMergeAgents = agents.filter((n) => n.id !== INFORMED_NODE_ID);
+  const postMergeAgents = agents.filter((n) => n.id === INFORMED_NODE_ID);
+  preMergeAgents.sort((a, b) => {
     const ai = agentOrder.indexOf(a.id);
     const bi = agentOrder.indexOf(b.id);
     const aKey = ai === -1 ? 100 : ai;
@@ -93,8 +96,9 @@ export function layoutPrismFlow(
   pushRow(sources, SOURCE_COL_GAP, 220);
   pushRow(hubs, COL_GAP, 220);
   pushRow(routers, COL_GAP, 220);
-  pushRow([...agents, ...rest], COL_GAP, 220);
+  pushRow([...preMergeAgents, ...rest], COL_GAP, 220);
   pushRow(merges, COL_GAP, 220);
+  pushRow(postMergeAgents, COL_GAP, 220);
 
   // Preserve any node we somehow missed
   const placedIds = new Set(placed.map((n) => n.id));
