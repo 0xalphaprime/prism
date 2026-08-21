@@ -101,6 +101,7 @@ Steer stays the *proximal* dial above Controls — don’t bury it.
 |------|---------|
 | Step | One node at a time; inspect artifact |
 | Run all | Full pathway |
+| **Eval Lab** | Frozen questions × isolated architectures × reps; binary scores + experiment package |
 | Seeded rerun | Same topology, fixed seed |
 | Model sweep | Same Role/Steer/Prompt, swap models |
 | Compare runs | Diff outputs / metrics side by side |
@@ -140,7 +141,7 @@ Full notes: [`RESEARCH.md`](../RESEARCH.md).
 
 1. **Done** — graph CRUD, Expand attributes, Hub + late inject  
 2. **Done (Block 3)** — Step / Run all; intelligent Split route plan; compose Role+Steer+Prompt+context; temp / max tokens / keep-k / schema hint  
-3. **Next** — Compare runs + publish export UI (rubric + visibility)  
+3. **Next** — Compare runs + leftover gold fill + publish export UI (rubric + visibility)  
 4. **Edge filters / richer Route levers** — sparsify *what* travels; learned activation beyond one plan call  
 5. **Gallery + parallel instances** — public-good scale  
 

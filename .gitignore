@@ -39,6 +39,7 @@ yarn-error.log*
 
 # local lab exhaust (written by POST /api/lab/run-student)
 /data/student-lab-last-run.json
+/data/eval/experiments/
 
 # vercel
 .vercel

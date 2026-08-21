@@ -175,6 +175,9 @@ export function ArchitectureBar() {
           <Link href="/trace" className="btn btn-accent">
             Trace ({active.runs.length})
           </Link>
+          <Link href="/eval" className="btn btn-accent">
+            Eval
+          </Link>
 
           <details ref={moreRef} className="architecture-more">
             <summary className="btn">More</summary>

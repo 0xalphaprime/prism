@@ -150,18 +150,20 @@ function ingestLooksTruncated(ingest: NodeIngest | undefined, extra?: string) {
 function stampIngest(args: {
   node: Node<PrismNodeData>;
   nodes: Node<PrismNodeData>[];
+  edges: Edge[];
   ingest: NodeIngest;
 }): Pick<
   PrismNodeData,
   "ingest" | "namedIngest" | "isolation" | "ingestHash" | "truncated"
 > {
-  const { node, nodes, ingest } = args;
+  const { node, nodes, edges, ingest } = args;
   return {
     ingest,
     namedIngest: ingest.named,
     isolation: isolationReport({
       nodeId: node.id,
       nodes,
+      edges,
       upstreamIds: ingest.upstreamIds,
     }),
     ingestHash: hashJson(ingest.messages),
@@ -233,7 +235,7 @@ export function backfillIngestOnNodes(
           truncated: node.data.truncated ?? textLooksTruncated(output),
           isolation:
             node.data.isolation ??
-            isolationReport({ nodeId: node.id, nodes, upstreamIds: [] }),
+            isolationReport({ nodeId: node.id, nodes, edges, upstreamIds: [] }),
         },
       };
     }
@@ -260,7 +262,7 @@ export function backfillIngestOnNodes(
     const filled: NodeIngest = { ...ingest, named };
     return {
       ...node,
-      data: { ...node.data, ...stampIngest({ node, nodes, ingest: filled }) },
+      data: { ...node.data, ...stampIngest({ node, nodes, edges, ingest: filled }) },
     };
   });
 }
@@ -315,6 +317,7 @@ export async function executeNodeStep(args: {
         isolation: isolationReport({
           nodeId,
           nodes,
+          edges,
           upstreamIds: [],
         }),
       },
@@ -357,7 +360,7 @@ export async function executeNodeStep(args: {
       error: "Missing ingest",
     };
   }
-  const stamped = stampIngest({ node, nodes, ingest });
+  const stamped = stampIngest({ node, nodes, edges, ingest });
   const body = chatBodyForNode(node, ingest.messages);
   const requestedProvider = parseModelRef(body.model)?.provider;
   const result = await callChat(body, chat);

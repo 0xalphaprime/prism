@@ -1,4 +1,5 @@
 import type { PrismDocument } from "./document";
+import { EVAL_ARCHITECTURES } from "./eval/graphs";
 import { STARTER_EDGES, STARTER_NODES } from "./starter-graph";
 import { STUDENT_LAB_PROMPT } from "./student-lab";
 import { STUDENT_TEACHER_EDGES, STUDENT_TEACHER_NODES } from "./student-graph";
@@ -129,6 +130,25 @@ export const TEMPLATES: ArchitectureTemplate[] = [
       edges: STUDENT_TEACHER_EDGES.map((e) => ({ ...e })),
     }),
   },
+  ...EVAL_ARCHITECTURES.map((arch) => ({
+    id: arch.id,
+    name: arch.name,
+    description: arch.description,
+    tags: arch.tags,
+    build: () => ({
+      name: arch.name,
+      description: arch.description,
+      tags: arch.tags,
+      prompt: "",
+      templateId: arch.id,
+      nodes: arch.nodes.map((n) => ({
+        ...n,
+        data: { ...n.data },
+        position: { ...n.position },
+      })),
+      edges: arch.edges.map((e) => ({ ...e })),
+    }),
+  })),
 ];
 
 export function getTemplate(id: string) {
