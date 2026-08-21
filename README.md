@@ -9,15 +9,15 @@
   — W. Ross Ashby
 </p>
 
-A no-code **mixture-of-agents (MoA) laboratory**: compose multi-agent workflows as a living graph — context in upstream, specialists and models on each branch, step or run the system, inspect every bifurcation’s artifacts and metrics.
+A no-code **mixture-of-agents (MoA) laboratory**: compose multi-agent workflows as a living graph — context in upstream, specialists and models on each branch, **Step** or **Run all**, then read the run on **Trace**.
+
+The graph is how you compose the pathway. **Trace** is the report: who each hop saw, outputs in graph order, Judge keep/omit/never-say, and export files (human report, agent pack, causal JSONL). Prism does **not** train — it produces inspectable runs.
 
 Prism harnesses complexity by giving the system enough structured variety — roles, models, paths — to steer hard problems, not by collapsing everything into one linear chat.
 
 ## Status
 
-**Ships today:** graph shell with **Add tile** / **Delete** / rewire (incl. late context inject), select → **Expand** node workspace (Label / Role / **Steer** / Prompt / model), output reading page, architectures (save / template / export), connections + provider verify, docs, publish-package **schema**.
-
-**Next (Block 3):** Step / Run all — execute the pathway, fill outputs and metrics, compose Steer into provider calls.
+**Ships today:** graph chrome (Add tile / Delete / rewire, Expand workspace, presets), architectures (save / template / export), Connections + provider verify, **Step / Run all**, **Trace** (Scan / Engineer, isolation chips, Copy all + export), starter MoA and **Student vs teachers** (Hub-only Nemo + teachers → Judge → second Nemo).
 
 This is an early lab release. Expect sharp edges; issues and PRs welcome.
 
@@ -44,21 +44,23 @@ curl 'http://localhost:3001/api/providers?probe=1'
 
 In the app: **Connections → Verify providers** flips cards to Connected when a key works.
 
+A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) and the **Starter MoA** template. **Student vs teachers** also wants Ollama (`OLLAMA_BASE_URL`) for local Nemo; teachers still go through OpenRouter.
+
 ## Docs
 
 - **[Brand lock](docs/BRAND.md)** — Ashby tagline (canonical)
-- **[Product guide (v1)](docs/GUIDE.md)** — node kinds, Label / Role / Steer / Prompt, pipeline, research mapping
+- **[Product guide (v1)](docs/GUIDE.md)** — node kinds, Label / Role / Steer / Prompt, Trace, Student vs teachers, research mapping
 - **[Variety toolkit](docs/VARIETY.md)** — Ashby-guided attributes & roadmap brainstorm
 - **[Publish package schema](docs/PUBLISH.md)** — portable architecture + sample runs for gallery / fork
 - **[Research notes](RESEARCH.md)** — MoA lineage and orchestration stack
 
 ## What you can do now
 
-1. Load the starter MoA template (on the canvas)
-2. Place context channels → attach payloads in **Context**
-3. Set architecture **Prompt** (run intent)
-4. Tune **Role**, **Steer**, **Model**, and node **Prompt** on Split / agents / Judge
-5. **Log checkpoint** to start run history
+1. Load **Starter MoA** (or click **Student vs teachers**)
+2. Set architecture **Prompt** (run intent) — optional: attach payloads in **Context**
+3. Tune **Role**, **Steer**, **Model**, and node **Prompt** on tiles (select → **Expand**)
+4. **Run all** (or **Step** one hop) — Prism jumps to **Trace**
+5. Scan the spine (who saw whom), then **Export** if you want a pack for another chat or a training loop
 6. Try talk: `add a summarizer before the judge`
 
 ## Stack
