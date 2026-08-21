@@ -17,7 +17,7 @@ Prism harnesses complexity by giving the system enough structured variety — ro
 
 ## Status
 
-**Ships today:** graph chrome (Add tile / Delete / rewire, Expand workspace, presets), architectures (save / template / export), Connections + provider verify, **Step / Run all**, **Trace** (Scan / Engineer, isolation chips, Copy all + export), starter MoA and **Student vs teachers** (Hub-only Nemo + teachers → Judge → second Nemo).
+**Ships today:** graph chrome (Add tile / Delete / rewire, Expand workspace, presets), architectures (save / template / export), Connections + provider verify, **Step / Run all**, **Trace** (Scan / Engineer, isolation chips, Copy all + export), **Eval Lab** (frozen leftovers × isolated graphs × scored report), starter MoA and **Student vs teachers** (Hub-only Nemo + teachers → Judge → second Nemo).
 
 This is an early lab release. Expect sharp edges; issues and PRs welcome.
 
@@ -49,7 +49,7 @@ A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) an
 ## Docs
 
 - **[Brand lock](docs/BRAND.md)** — Ashby tagline (canonical)
-- **[Product guide (v1)](docs/GUIDE.md)** — node kinds, Label / Role / Steer / Prompt, Trace, Student vs teachers, research mapping
+- **[Product guide (v1)](docs/GUIDE.md)** — node kinds, Label / Role / Steer / Prompt, Trace, Eval Lab, Student vs teachers, research mapping
 - **[Variety toolkit](docs/VARIETY.md)** — Ashby-guided attributes & roadmap brainstorm
 - **[Publish package schema](docs/PUBLISH.md)** — portable architecture + sample runs for gallery / fork
 - **[Research notes](RESEARCH.md)** — MoA lineage and orchestration stack
@@ -61,7 +61,8 @@ A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) an
 3. Tune **Role**, **Steer**, **Model**, and node **Prompt** on tiles (select → **Expand**)
 4. **Run all** (or **Step** one hop) — Prism jumps to **Trace**
 5. Scan the spine (who saw whom), then **Export** if you want a pack for another chat or a training loop
-6. Try talk: `add a summarizer before the judge`
+6. Open **Eval** to queue the same leftover across baseline / teacher refine / teacher+critic
+7. Try talk: `add a summarizer before the judge`
 
 ## Stack
 

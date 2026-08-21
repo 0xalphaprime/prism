@@ -3,7 +3,7 @@
 **Audience.** Builders using Prism as a mixture-of-agents (MoA) laboratory.  
 **Companion.** Deep paper notes live in [`RESEARCH.md`](../RESEARCH.md). This guide is product-first.  
 **Tagline.** *Only variety can absorb variety.* — W. Ross Ashby  
-**Last updated.** 2026-08-17
+**Last updated.** 2026-08-21
 
 ---
 
@@ -61,6 +61,7 @@ Around the graph:
 | **Context** (`/context`) | Attach and manage payloads for each channel |
 | **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
 | **Trace** (`/trace`) | Product report — Scan / Engineer, spine jump, who each hop saw, Judge chips, Copy all + export menu |
+| **Eval** (`/eval`) | Frozen questions × isolated architectures × scored comparison |
 | **Talk** | Natural-language edits that land on the same graph |
 
 **Topology note.** Channels default into **Context Hub**, then Split → agents → Judge. You may also drag a channel (or Hub) **directly into a downstream node** for intentional late context inject. See [`VARIETY.md`](VARIETY.md) for the toolkit roadmap.
@@ -259,6 +260,38 @@ If the graph grid is empty over a Tailscale URL, Next blocked the client JS — 
 
 Talk bar examples that mutate the same graph: `add a summarizer before the judge`, `use the cheaper model on research`.
 
+### Eval Lab
+
+Use **Eval** when the question is “did feedback fix this leftover, and what should we change?” Foundry stays the student. Prism does not train.
+
+**Three isolated experiment graphs** (also under More → Template). Do not reuse interactive Student vs teachers for the matrix — that pathway still packs Teacher/Critic essays into second Nemo.
+
+| ID | Graph | Second Nemo sees | Measures |
+|----|--------|------------------|----------|
+| `eval-baseline` | Hub → Nemo | none | What Lightning does unaided |
+| `eval-teacher-refine` | Hub → Nemo → Teacher (reads Nemo) → Nemo revise | Hub + first Nemo + Teacher feedback | Direct instruction |
+| `eval-teacher-critic` | Independent Teacher + Critic → Judge card → Nemo revise | Hub + first Nemo + **Judge card only** | Full feedback lift |
+
+Isolation is per-architecture:
+
+- Interactive Student vs teachers / eval teacher+critic: Teacher/Critic **must not** see Nemo.
+- Eval teacher refine: Teacher **must** see first Nemo.
+- Eval teacher+critic second hop: Nemo **must not** ingest Teacher/Critic prose.
+
+Frozen set: [`data/eval/prime-leftovers.v1.json`](../data/eval/prime-leftovers.v1.json). Phase 1 scores `missing-fact-8`; other items are tagged scaffolds until Foundry notes fill `goldFacts` / `bits`.
+
+Queue: pick set, architectures, reps, temperature → **Create experiment** → **Run experiment**. One Foundry/Ollama student job at a time. Headless — the canvas is not swapped.
+
+Report views: executive winner + decision copy, question matrix, failure clusters, before/after. Downloads: human report, CSV, full JSON, causal JSONL, approved training JSONL (`split !== held-out`, isolation hold, first-pass Nemo only).
+
+Decision copy (not automation):
+
+- Baseline fails; feedback fixes it → SYSTEM / Steer first.
+- All three fail and the gold is absent → RAG / tools.
+- Right facts, wrong voice → possible LoRA candidate.
+- Card fixes in-context; held-out still fails → stronger fine-tune candidate.
+- Train-like up, held-out / easy down → reject adapter.
+
 ---
 
 ## 8. Publish package (schema sketch)
@@ -272,8 +305,8 @@ Fork → fill context slots → re-run → compare. Hosted runs (later) can debi
 
 | Horizon | What ships |
 |---------|------------|
-| **Now** | Graph chrome, **Trace** as product (Scan/Engineer, isolation, Judge chips, report / attribution / causal export), Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
-| **Next** | Compare runs UI; publish export; tighter keep‑k / consensus; tools allowlist at run time |
+| **Now** | Graph chrome, **Trace** as product, **Eval Lab** (frozen set × 3 isolated graphs × binary scores), Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
+| **Next** | LLM-as-judge scoring; leftover gold fill; cloud fan-out; publish export UI |
 | **Later** | Gallery / fork; optional account balance for hosted inference; **many parallel instances** of one pathway for extreme sweeps |
 
 The extreme end-state: define a pathway once, fan many instances with controlled variable grids, and harvest sequential artifacts across the swarm — still inspectable node by node.
@@ -307,6 +340,7 @@ The extreme end-state: define a pathway once, fan many instances with controlled
 | Clean layout | Re-spread vertical MoA spine |
 | Log checkpoint | Run history stub |
 | Trace (`/trace`) | Product report: Scan/Engineer, saw/isolation, Judge chips; Copy all + attribution + causal |
+| Eval (`/eval`) | Experiment matrix + scores + training-candidate export |
 | More → Template / Export / … | Architecture library ops |
 
 ---

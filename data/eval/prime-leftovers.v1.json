@@ -1,0 +1,188 @@
+{
+  "kind": "prism.evalset",
+  "schemaVersion": 1,
+  "id": "prime-leftovers.v1",
+  "name": "Prime leftovers v1",
+  "description": "Frozen Foundry leftovers for Prism Eval Lab. Only missing-fact-8 is fully scored; remaining items are tagged scaffolds — fill goldFacts and bits from Foundry notes before trusting a scored experiment.",
+  "items": [
+    {
+      "id": "missing-fact-8",
+      "split": "train",
+      "tags": ["missing-facts", "unsupported-certainty", "polarity"],
+      "prompt": "Internal Slack to Prime: did we flip Oak Hill off Vidonic? We do not have product-on-shelf or a first case in this prompt. Colten was in front of Mario Saturday — that is all we know.",
+      "allowedContext": "Sharp edge (Foundry leftover): say we don’t have a fact — never invent logistics, ASP, or case counts. Never write “in this prompt.”\n\nGold notes: competitive ASP unobtainable; cables customer-direct (no lot tracking / no truck); Jeff = THR; VPX = CTH.\n\nThis run: KEEP Colten + Mario Saturday. Do not declare Oak Hill flipped. No product-on-shelf / first case.",
+      "goldFacts": [
+        "Colten was in front of Mario Saturday",
+        "competitive ASP unobtainable",
+        "cables customer-direct"
+      ],
+      "forbiddenClaims": [
+        "in this prompt",
+        "Oak Hill flipped",
+        "we flipped Oak Hill",
+        "product-on-shelf",
+        "first case"
+      ],
+      "bits": [
+        {
+          "id": "keep-colten",
+          "kind": "must-include",
+          "pattern": "Colten"
+        },
+        {
+          "id": "keep-mario",
+          "kind": "must-include",
+          "pattern": "Mario"
+        },
+        {
+          "id": "no-harness-leak",
+          "kind": "must-exclude",
+          "pattern": "in this prompt"
+        },
+        {
+          "id": "no-oak-hill-flipped",
+          "kind": "must-exclude",
+          "pattern": "/(we |yes,? )?(flipped|flip) Oak Hill|Oak Hill (is |was |has been )?flipped/i"
+        },
+        {
+          "id": "no-invented-asp",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d|ASP (of|is|at) \\d/i"
+        },
+        {
+          "id": "omit-unknown",
+          "kind": "must-omit-unknown",
+          "pattern": "/don'?t have|do not have|we don'?t know|unknown|not (in|on) (the )?(record|hub|notes)/i"
+        }
+      ],
+      "failureTags": [
+        "invented-fact",
+        "harness-leak",
+        "polarity-trap",
+        "unsupported-certainty"
+      ],
+      "referenceAnswer": "We do not have a flip confirmation for Oak Hill. What we know: Colten was in front of Mario Saturday. No product-on-shelf or first-case claim. Competitive ASP is unobtainable; cables are customer-direct."
+    },
+    {
+      "id": "unsupported-certainty-1",
+      "split": "train",
+      "tags": ["unsupported-certainty", "missing-facts"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["unsupported-certainty"]
+    },
+    {
+      "id": "prime-voice-1",
+      "split": "train",
+      "tags": ["prime-voice"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["wrong-voice"]
+    },
+    {
+      "id": "named-attribution-1",
+      "split": "train",
+      "tags": ["named-attribution", "prime-voice"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["missing-attribution"]
+    },
+    {
+      "id": "product-line-1",
+      "split": "train",
+      "tags": ["product-line"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["line-mixup"]
+    },
+    {
+      "id": "scope-drift-1",
+      "split": "train",
+      "tags": ["scope-drift"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["scope-drift"]
+    },
+    {
+      "id": "phi-privacy-1",
+      "split": "train",
+      "tags": ["phi-privacy"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["phi-leak"]
+    },
+    {
+      "id": "formatting-brevity-1",
+      "split": "dev",
+      "tags": ["formatting", "brevity"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["verbose", "format-miss"]
+    },
+    {
+      "id": "tool-rag-boundary-1",
+      "split": "train",
+      "tags": ["tool-rag-boundary", "missing-facts"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["hallucinated-tool", "missing-facts"]
+    },
+    {
+      "id": "polarity-vidonic-1",
+      "split": "train",
+      "tags": ["polarity"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["polarity-trap"]
+    },
+    {
+      "id": "easy-greeting-1",
+      "split": "held-out",
+      "tags": ["easy"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["easy-regression"]
+    },
+    {
+      "id": "easy-schedule-1",
+      "split": "held-out",
+      "tags": ["easy"],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
+      "failureTags": ["easy-regression"]
+    }
+  ]
+}
