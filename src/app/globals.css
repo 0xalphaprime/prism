@@ -1937,6 +1937,35 @@ a.btn {
   background: var(--bg-elevated) !important;
 }
 
+.prism-map-toggle-panel {
+  margin: 0 0.65rem 0.65rem 0;
+}
+
+/* Sit above the MiniMap so Hide map stays tappable */
+.prism-map-toggle-panel--open {
+  margin-bottom: 11.5rem;
+}
+
+.prism-map-toggle {
+  appearance: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.45rem 0.7rem;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.prism-map-toggle[aria-pressed="true"] {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
 .react-flow__edge-path {
   stroke: var(--edge) !important;
 }

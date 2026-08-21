@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     "100.111.89.59",
     "127.0.0.1",
     "*.ts.net",
+    "*.trycloudflare.com",
     ...extraOrigins,
   ],
 };
