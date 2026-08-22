@@ -3,186 +3,289 @@
   "schemaVersion": 1,
   "id": "prime-leftovers.v1",
   "name": "Prime leftovers v1",
-  "description": "Frozen Foundry leftovers for Prism Eval Lab. Only missing-fact-8 is fully scored; remaining items are tagged scaffolds — fill goldFacts and bits from Foundry notes before trusting a scored experiment.",
+  "description": "Compiled runtime set. Signed source lives in Foundry lora/eval-cards/<id>.json. missing-fact-8 is excluded. Empty shells are not signed cards.",
   "items": [
     {
       "id": "missing-fact-8",
       "split": "train",
-      "tags": ["missing-facts", "unsupported-certainty", "polarity"],
-      "prompt": "Internal Slack to Prime: did we flip Oak Hill off Vidonic? We do not have product-on-shelf or a first case in this prompt. Colten was in front of Mario Saturday — that is all we know.",
-      "allowedContext": "Sharp edge (Foundry leftover): say we don’t have a fact — never invent logistics, ASP, or case counts. Never write “in this prompt.”\n\nGold notes: competitive ASP unobtainable; cables customer-direct (no lot tracking / no truck); Jeff = THR; VPX = CTH.\n\nThis run: KEEP Colten + Mario Saturday. Do not declare Oak Hill flipped. No product-on-shelf / first case.",
-      "goldFacts": [
-        "Colten was in front of Mario Saturday",
-        "competitive ASP unobtainable",
-        "cables customer-direct"
+      "tags": [
+        "missing-facts",
+        "unsupported-certainty",
+        "polarity"
       ],
-      "forbiddenClaims": [
-        "in this prompt",
-        "Oak Hill flipped",
-        "we flipped Oak Hill",
-        "product-on-shelf",
-        "first case"
-      ],
-      "bits": [
-        {
-          "id": "keep-colten",
-          "kind": "must-include",
-          "pattern": "Colten"
-        },
-        {
-          "id": "keep-mario",
-          "kind": "must-include",
-          "pattern": "Mario"
-        },
-        {
-          "id": "no-harness-leak",
-          "kind": "must-exclude",
-          "pattern": "in this prompt"
-        },
-        {
-          "id": "no-oak-hill-flipped",
-          "kind": "must-exclude",
-          "pattern": "/(we |yes,? )?(flipped|flip) Oak Hill|Oak Hill (is |was |has been )?flipped/i"
-        },
-        {
-          "id": "no-invented-asp",
-          "kind": "must-exclude",
-          "pattern": "/\\$\\s?\\d|ASP (of|is|at) \\d/i"
-        },
-        {
-          "id": "omit-unknown",
-          "kind": "must-omit-unknown",
-          "pattern": "/don'?t have|do not have|we don'?t know|unknown|not (in|on) (the )?(record|hub|notes)/i"
-        }
-      ],
+      "prompt": "",
+      "allowedContext": "",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [],
       "failureTags": [
         "invented-fact",
         "harness-leak",
         "polarity-trap",
         "unsupported-certainty"
-      ],
-      "referenceAnswer": "We do not have a flip confirmation for Oak Hill. What we know: Colten was in front of Mario Saturday. No product-on-shelf or first-case claim. Competitive ASP is unobtainable; cables are customer-direct."
+      ]
     },
     {
       "id": "unsupported-certainty-1",
       "split": "train",
-      "tags": ["unsupported-certainty", "missing-facts"],
-      "prompt": "",
-      "allowedContext": "",
+      "tags": [
+        "unsupported-certainty",
+        "missing-facts"
+      ],
+      "prompt": "Internal Slack to Prime: did Advent Tampa start the Belli sternal-cable trial? Joey has the Belli tray locked. We do not have a first case or a start date. Do not invent how many patients or a dollar.",
+      "allowedContext": "We only know Joey has the Belli tray locked at Advent Tampa.\nKEEP Joey + Advent Tampa + Belli.\nOmit first case, start date, patient count, and any $.\nCables are customer-direct (no lot). No truck. No invented coordinator.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
-      "failureTags": ["unsupported-certainty"]
+      "forbiddenClaims": [
+        "they started",
+        "we started",
+        "trial started",
+        "started the trial",
+        "completed the trial",
+        "five patients done"
+      ],
+      "bits": [
+        {
+          "id": "keep-joey",
+          "kind": "must-include",
+          "pattern": "Joey"
+        },
+        {
+          "id": "keep-belli",
+          "kind": "must-include",
+          "pattern": "Belli"
+        },
+        {
+          "id": "keep-advent",
+          "kind": "must-include",
+          "pattern": "Advent"
+        },
+        {
+          "id": "no-started",
+          "kind": "must-exclude",
+          "pattern": "/\\b(they|we|trial) started\\b|started the (Belli|trial)|first case (is|was|done|completed)|had (a |the )?first case/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        },
+        {
+          "id": "omit-unknown",
+          "kind": "must-omit-unknown",
+          "pattern": "/don'?t have|do not have|we don'?t know|no (first case|start date)|unknown/i"
+        }
+      ],
+      "failureTags": [
+        "unsupported-certainty",
+        "invented-fact"
+      ],
+      "referenceAnswer": "We don\u2019t have a start or a first case on the Belli sternal-cable trial at Advent Tampa. What we know: Joey has the Belli tray locked."
     },
     {
       "id": "prime-voice-1",
       "split": "train",
-      "tags": ["prime-voice"],
-      "prompt": "",
-      "allowedContext": "",
+      "tags": [
+        "prime-voice"
+      ],
+      "prompt": "Rewrite in Prime\u2019s voice: \u201cI personally drove the Advantage add at Jackson, and I think I can get Ruiz to sign if I follow up.\u201d Keep the meaning, use team voice, and keep it to one short paragraph. Do not add patient names.",
+      "allowedContext": "Prime drove the Advantage add at Jackson.\nRuiz did not drive or lead that work; Ruiz is the person Prime will follow up with for sign-off.\nUse we/our for Prime\u2019s actions, never hero I/my/personally.\nDo not add patient names, prices, contract terms, or clinical claims.\nReturn only one short, sendable paragraph.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
-      "failureTags": ["wrong-voice"]
+      "forbiddenClaims": [
+        "I personally",
+        "I drove",
+        "I can get Ruiz",
+        "Ruiz drove",
+        "Ruiz set up",
+        "Here's a revised",
+        "Here's a rewrite"
+      ],
+      "bits": [
+        {
+          "id": "team-we",
+          "kind": "must-include",
+          "pattern": "/\\b(we|our)\\b/i"
+        },
+        {
+          "id": "keep-advantage",
+          "kind": "must-include",
+          "pattern": "Advantage"
+        },
+        {
+          "id": "keep-jackson",
+          "kind": "must-include",
+          "pattern": "Jackson"
+        },
+        {
+          "id": "keep-ruiz",
+          "kind": "must-include",
+          "pattern": "Ruiz"
+        },
+        {
+          "id": "no-hero-i",
+          "kind": "must-exclude",
+          "pattern": "/\\bI(?:['\u2019](?:m|ve|d|ll))?\\b|\\b(?:my|mine|myself|personally)\\b/i"
+        },
+        {
+          "id": "no-credit-transfer",
+          "kind": "must-exclude",
+          "pattern": "/\\bRuiz\\b.{0,20}\\b(drove|led|handled|set up)\\b/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        },
+        {
+          "id": "no-wrapper",
+          "kind": "must-exclude",
+          "pattern": "/here(?:'s| is) (?:a |the )?(?:revised|rewrite|rewritten)|as an AI|I hope this helps|let me know if/i"
+        }
+      ],
+      "failureTags": [
+        "wrong-voice",
+        "credit-transfer"
+      ],
+      "referenceAnswer": "We drove the Advantage add at Jackson and are following up with Ruiz to secure the sign-off."
     },
     {
       "id": "named-attribution-1",
       "split": "train",
-      "tags": ["named-attribution", "prime-voice"],
+      "tags": [
+        "named-attribution",
+        "prime-voice"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["missing-attribution"]
+      "failureTags": [
+        "missing-attribution"
+      ]
     },
     {
       "id": "product-line-1",
       "split": "train",
-      "tags": ["product-line"],
+      "tags": [
+        "product-line"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["line-mixup"]
+      "failureTags": [
+        "line-mixup"
+      ]
     },
     {
       "id": "scope-drift-1",
       "split": "train",
-      "tags": ["scope-drift"],
+      "tags": [
+        "scope-drift"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["scope-drift"]
+      "failureTags": [
+        "scope-drift"
+      ]
     },
     {
       "id": "phi-privacy-1",
       "split": "train",
-      "tags": ["phi-privacy"],
+      "tags": [
+        "phi-privacy"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["phi-leak"]
+      "failureTags": [
+        "phi-leak"
+      ]
     },
     {
       "id": "formatting-brevity-1",
       "split": "dev",
-      "tags": ["formatting", "brevity"],
+      "tags": [
+        "formatting",
+        "brevity"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["verbose", "format-miss"]
+      "failureTags": [
+        "verbose",
+        "format-miss"
+      ]
     },
     {
       "id": "tool-rag-boundary-1",
       "split": "train",
-      "tags": ["tool-rag-boundary", "missing-facts"],
+      "tags": [
+        "tool-rag-boundary",
+        "missing-facts"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["hallucinated-tool", "missing-facts"]
+      "failureTags": [
+        "hallucinated-tool",
+        "missing-facts"
+      ]
     },
     {
       "id": "polarity-vidonic-1",
       "split": "train",
-      "tags": ["polarity"],
+      "tags": [
+        "polarity"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["polarity-trap"]
+      "failureTags": [
+        "polarity-trap"
+      ]
     },
     {
       "id": "easy-greeting-1",
       "split": "held-out",
-      "tags": ["easy"],
+      "tags": [
+        "easy"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["easy-regression"]
+      "failureTags": [
+        "easy-regression"
+      ]
     },
     {
       "id": "easy-schedule-1",
       "split": "held-out",
-      "tags": ["easy"],
+      "tags": [
+        "easy"
+      ],
       "prompt": "",
       "allowedContext": "",
       "goldFacts": [],
       "forbiddenClaims": [],
       "bits": [],
-      "failureTags": ["easy-regression"]
+      "failureTags": [
+        "easy-regression"
+      ]
     }
   ]
 }
