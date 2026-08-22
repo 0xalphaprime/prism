@@ -32,13 +32,13 @@ export async function GET(request: Request) {
     if (!TABLE_ID.test(tableId)) {
       return NextResponse.json({ error: "Invalid table id" }, { status: 400 });
     }
-    const items = await listAirtableRecords({
+    const page = await listAirtableRecords({
       baseId,
       tableId,
       tableName: tableName || undefined,
       query: q,
     });
-    return NextResponse.json({ items });
+    return NextResponse.json(page);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status = /AIRTABLE_PAT/i.test(message) ? 503 : 502;
