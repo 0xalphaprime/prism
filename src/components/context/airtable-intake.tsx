@@ -44,6 +44,7 @@ export function AirtableIntake({
   const [tableId, setTableId] = useState("");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -157,6 +158,7 @@ export function AirtableIntake({
   useEffect(() => {
     if (!connected || !baseId || !tableId) {
       setRecords([]);
+      setTruncated(false);
       return;
     }
     let cancelled = false;
@@ -173,15 +175,18 @@ export function AirtableIntake({
         .then(async (res) => {
           const data = (await res.json()) as {
             items?: AirtableHit[];
+            truncated?: boolean;
             error?: string;
           };
           if (cancelled) return;
           if (!res.ok) {
             setError(data.error || "Could not list records");
             setRecords([]);
+            setTruncated(false);
             return;
           }
           setRecords(data.items ?? []);
+          setTruncated(Boolean(data.truncated));
           setSelected(new Set());
         })
         .catch((err) => {
@@ -208,6 +213,17 @@ export function AirtableIntake({
       else next.add(id);
       return next;
     });
+  }
+
+  const allSelected =
+    records.length > 0 && records.every((hit) => selected.has(hit.id));
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected(new Set());
+      return;
+    }
+    setSelected(new Set(records.map((hit) => hit.id)));
   }
 
   function addSelected() {
@@ -302,29 +318,54 @@ export function AirtableIntake({
       ) : null}
       {error ? <p className="channel-intake-error">{error}</p> : null}
       {tableId ? (
-        <ul className="airtable-record-list">
-          {loading ? (
-            <li className="channel-intake-hint">Loading records…</li>
-          ) : records.length === 0 ? (
-            <li className="channel-intake-hint">No records in this slice.</li>
-          ) : (
-            records.map((hit) => (
-              <li key={hit.id}>
-                <label className="airtable-record-row">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(hit.id)}
-                    onChange={() => toggle(hit.id)}
-                  />
-                  <span>
-                    <strong>{hit.title}</strong>
-                    <em>{hit.excerpt?.slice(0, 96) || hit.subtitle}</em>
-                  </span>
-                </label>
-              </li>
-            ))
-          )}
-        </ul>
+        <>
+          {truncated ? (
+            <p className="channel-intake-hint">
+              Showing the first {records.length} matching records. Filter to
+              narrow, then Select all.
+            </p>
+          ) : null}
+          <ul className="airtable-record-list">
+            {loading ? (
+              <li className="channel-intake-hint">Loading records…</li>
+            ) : records.length === 0 ? (
+              <li className="channel-intake-hint">No records in this slice.</li>
+            ) : (
+              <>
+                <li>
+                  <label className="airtable-record-row airtable-record-all">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                    />
+                    <span>
+                      <strong>Select all</strong>
+                      <em>
+                        {selected.size} of {records.length} in this table
+                      </em>
+                    </span>
+                  </label>
+                </li>
+                {records.map((hit) => (
+                  <li key={hit.id}>
+                    <label className="airtable-record-row">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(hit.id)}
+                        onChange={() => toggle(hit.id)}
+                      />
+                      <span>
+                        <strong>{hit.title}</strong>
+                        <em>{hit.excerpt?.slice(0, 96) || hit.subtitle}</em>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </>
+            )}
+          </ul>
+        </>
       ) : (
         <p className="channel-intake-hint">
           Pick a table yourself — Prism will not dump the first table for you.

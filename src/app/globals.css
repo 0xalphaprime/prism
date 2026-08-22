@@ -2508,6 +2508,11 @@ a.btn {
   color: var(--ink-faint);
 }
 
+.airtable-record-all {
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
 .trace-layout {
   display: grid;
   grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);

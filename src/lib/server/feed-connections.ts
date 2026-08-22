@@ -472,49 +472,69 @@ function recordPackText(fields: Record<string, unknown>): string {
   return lines.join("\n").slice(0, 4000);
 }
 
+export type AirtableRecordPage = {
+  items: ListedContextItem[];
+  truncated: boolean;
+};
+
+const AIRTABLE_RECORD_CAP = 200;
+
 export async function listAirtableRecords(args: {
   baseId: string;
   tableId: string;
   tableName?: string;
   query?: string;
-}): Promise<ListedContextItem[]> {
+}): Promise<AirtableRecordPage> {
   const { baseId, tableId, tableName, query } = args;
-  const params = new URLSearchParams({ maxRecords: "40" });
-  const data = await airtableJson<{
-    records?: Array<{ id: string; fields: Record<string, unknown> }>;
-  }>(
-    `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableId)}?${params}`,
-  );
   const q = query?.trim().toLowerCase() ?? "";
   const label = tableName || tableId;
   const items: ListedContextItem[] = [];
-  for (const rec of data.records ?? []) {
-    const title =
-      fieldString(rec.fields, ["Name", "Title", "Card", "Topic", "Account"]) ||
-      rec.id;
-    const excerpt = recordPackText(rec.fields);
-    if (
-      q &&
-      !title.toLowerCase().includes(q) &&
-      !excerpt.toLowerCase().includes(q)
-    ) {
-      continue;
+  let offset: string | undefined;
+  let truncated = false;
+
+  do {
+    const params = new URLSearchParams({ pageSize: "100" });
+    if (offset) params.set("offset", offset);
+    const data = await airtableJson<{
+      records?: Array<{ id: string; fields: Record<string, unknown> }>;
+      offset?: string;
+    }>(
+      `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableId)}?${params}`,
+    );
+    for (const rec of data.records ?? []) {
+      const title =
+        fieldString(rec.fields, ["Name", "Title", "Card", "Topic", "Account"]) ||
+        rec.id;
+      const excerpt = recordPackText(rec.fields);
+      if (
+        q &&
+        !title.toLowerCase().includes(q) &&
+        !excerpt.toLowerCase().includes(q)
+      ) {
+        continue;
+      }
+      items.push({
+        id: `airtable-${baseId}-${rec.id}`,
+        title,
+        subtitle: `Airtable · ${label}`,
+        excerpt,
+        meta: {
+          source: "airtable",
+          baseId,
+          tableId,
+          tableName: label,
+          recordId: rec.id,
+        },
+      });
+      if (items.length >= AIRTABLE_RECORD_CAP) {
+        truncated = true;
+        break;
+      }
     }
-    items.push({
-      id: `airtable-${baseId}-${rec.id}`,
-      title,
-      subtitle: `Airtable · ${label}`,
-      excerpt,
-      meta: {
-        source: "airtable",
-        baseId,
-        tableId,
-        tableName: label,
-        recordId: rec.id,
-      },
-    });
-  }
-  return items;
+    offset = truncated ? undefined : data.offset;
+  } while (offset);
+
+  return { items, truncated };
 }
 
 /**
