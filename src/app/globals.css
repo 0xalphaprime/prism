@@ -2097,6 +2097,44 @@ a.btn {
   min-height: 280px;
 }
 
+.builder-workspace-input {
+  min-height: 180px;
+}
+
+.builder-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.builder-example {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-node);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+}
+
+.builder-example:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+.builder-example:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.builder-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  max-width: 46rem;
+}
+
 .node-workspace {
   max-width: 1180px;
 }
@@ -2926,6 +2964,38 @@ a.btn {
 }
 
 .eval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.eval-import {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.eval-import label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.eval-import-input {
+  width: 100%;
+  min-height: 8rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg-node);
+  color: var(--ink);
+  padding: 0.55rem 0.65rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.eval-import-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;

@@ -18,6 +18,8 @@ type AirtableHit = {
   meta?: Record<string, string>;
 };
 
+const ALL_TABLES = "all";
+
 export function AirtableIntake({
   onAttach,
 }: {
@@ -48,10 +50,11 @@ export function AirtableIntake({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const tableName = useMemo(
-    () => tables.find((t) => t.id === tableId)?.name ?? "",
-    [tables, tableId],
-  );
+  const allTables = tableId === ALL_TABLES;
+  const tableName = useMemo(() => {
+    if (tableId === ALL_TABLES) return "all tables";
+    return tables.find((t) => t.id === tableId)?.name ?? "";
+  }, [tables, tableId]);
 
   const verify = useCallback(async () => {
     setVerifying(true);
@@ -301,6 +304,9 @@ export function AirtableIntake({
           disabled={!baseId}
         >
           <option value="">Pick a table…</option>
+          {tables.length > 0 ? (
+            <option value={ALL_TABLES}>All tables ({tables.length})</option>
+          ) : null}
           {tables.map((table) => (
             <option key={table.id} value={table.id}>
               {table.name}
@@ -321,8 +327,9 @@ export function AirtableIntake({
         <>
           {truncated ? (
             <p className="channel-intake-hint">
-              Showing the first {records.length} matching records. Filter to
-              narrow, then Select all.
+              Showing the first {records.length} matching records
+              {allTables ? " across tables" : ""}. Filter to narrow, then Select
+              all.
             </p>
           ) : null}
           <ul className="airtable-record-list">
@@ -342,7 +349,8 @@ export function AirtableIntake({
                     <span>
                       <strong>Select all</strong>
                       <em>
-                        {selected.size} of {records.length} in this table
+                        {selected.size} of {records.length}
+                        {allTables ? " across all tables" : " in this table"}
                       </em>
                     </span>
                   </label>
@@ -368,7 +376,8 @@ export function AirtableIntake({
         </>
       ) : (
         <p className="channel-intake-hint">
-          Pick a table yourself — Prism will not dump the first table for you.
+          Pick a table, or <strong>All tables</strong> — Prism will not dump a
+          table until you choose.
         </p>
       )}
       <button

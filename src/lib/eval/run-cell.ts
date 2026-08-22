@@ -1,3 +1,4 @@
+import type { AttachedContext } from "@/lib/context-sources";
 import type { Node } from "@xyflow/react";
 import type { ChatFn } from "@/lib/run-engine";
 import { executeNodeStep } from "@/lib/run-engine";
@@ -15,7 +16,12 @@ import type { NodeMetrics, PrismNodeData } from "@/lib/types";
 import { newId } from "@/lib/id";
 import { applyEvalProfile, cloneEvalGraph, EVAL_INFORMED_ID } from "./graphs";
 import { liftBetween, scoreHop } from "./score";
-import type { EvalItem, ExperimentCell, ExperimentProfile } from "./types";
+import type {
+  EvalArchitectureId,
+  EvalItem,
+  ExperimentCell,
+  ExperimentProfile,
+} from "./types";
 
 function applyPatch(
   nodes: Node<PrismNodeData>[],
@@ -84,6 +90,37 @@ function sumTotals(nodes: Node<PrismNodeData>[]): NodeMetrics {
   );
 }
 
+export const EVAL_ATTACHED_CONTEXT: AttachedContext[] = [];
+
+export function seedEvalCellGraph(
+  item: EvalItem,
+  architectureId: EvalArchitectureId,
+  profile: ExperimentProfile = {},
+): {
+  nodes: Node<PrismNodeData>[];
+  edges: ReturnType<typeof cloneEvalGraph>["edges"];
+  attachedContext: AttachedContext[];
+} {
+  const graph = cloneEvalGraph(architectureId);
+  const nodes = applyEvalProfile(graph.nodes, profile).map((n) =>
+    n.id === "context"
+      ? {
+          ...n,
+          data: { ...n.data, content: item.allowedContext, status: "idle" as const },
+        }
+      : {
+          ...n,
+          data: {
+            ...n.data,
+            status: "idle" as const,
+            output: undefined,
+            metrics: undefined,
+          },
+        },
+  );
+  return { nodes, edges: graph.edges, attachedContext: EVAL_ATTACHED_CONTEXT };
+}
+
 export async function executeEvalCell(args: {
   item: EvalItem;
   architectureId: ExperimentCell["architectureId"];
@@ -92,13 +129,9 @@ export async function executeEvalCell(args: {
   cellId: string;
   runId?: string;
 }): Promise<ExperimentCell> {
-  const graph = cloneEvalGraph(args.architectureId);
-  let nodes: Node<PrismNodeData>[] = applyEvalProfile(graph.nodes, args.profile).map((n) =>
-    n.id === "context"
-      ? { ...n, data: { ...n.data, content: args.item.allowedContext, status: "idle" } }
-      : { ...n, data: { ...n.data, status: "idle", output: undefined, metrics: undefined } },
-  );
-  const edges = graph.edges;
+  const seeded = seedEvalCellGraph(args.item, args.architectureId, args.profile);
+  let nodes = seeded.nodes;
+  const edges = seeded.edges;
   const runId = args.runId ?? newId();
   let error: string | undefined;
   let routePlan = null;
@@ -110,7 +143,7 @@ export async function executeEvalCell(args: {
       nodeId,
       nodes,
       edges,
-      attachedContext: [],
+      attachedContext: seeded.attachedContext,
       architecturePrompt: args.item.prompt,
       activeRoutePlan: routePlan,
       chat: serverChat,

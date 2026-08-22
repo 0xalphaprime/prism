@@ -12,6 +12,7 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 import { create } from "zustand";
+import { BUILDER_TEMPLATE_ID } from "@/lib/builder-agent";
 import {
   clearRunFields,
   createDocumentFromGraph,
@@ -203,6 +204,7 @@ type GraphState = {
   saveArchitectureAs: (name: string) => void;
   createArchitecture: (name?: string) => void;
   createFromTemplate: (templateId: string) => void;
+  createFromBuilderDocument: (doc: PrismDocument) => void;
   duplicateArchitecture: () => void;
   deleteArchitecture: () => void;
   exportActiveArchitecture: () => string;
@@ -1715,6 +1717,47 @@ export const useGraphStore = create<GraphState>((set, get) => {
         layoutEpoch: get().layoutEpoch + 1,
         lastTalkMutation: {
           summary: `Started from template “${template.name}”.`,
+          applied: true,
+        },
+      });
+      saveLibrary({ schemaVersion: 3, activeId: created.id, items });
+    },
+
+    createFromBuilderDocument: (doc) => {
+      if (!doc?.nodes?.length) {
+        set({
+          lastTalkMutation: {
+            summary: "Builder returned an empty graph.",
+            applied: false,
+          },
+        });
+        return;
+      }
+      const flushed = persist(get);
+      const created: PrismDocument = {
+        ...doc,
+        id: newId(),
+        owner: { id: get().user.id, name: get().user.name },
+        templateId: BUILDER_TEMPLATE_ID,
+        nodes: normalizeGraphLayout(normalizeNodes(clearRunFields(doc.nodes))),
+        edges: (doc.edges ?? []).map((e) => ({ ...e })),
+        runs: [],
+        attachedContext: [],
+        updatedAt: Date.now(),
+        createdAt: Date.now(),
+      };
+      const items = [...flushed, created];
+      set({
+        architectures: items,
+        activeId: created.id,
+        nodes: created.nodes,
+        edges: created.edges,
+        selectedNodeId: null,
+        selectedRunId: null,
+        dirty: false,
+        layoutEpoch: get().layoutEpoch + 1,
+        lastTalkMutation: {
+          summary: `Built “${created.name}”.`,
           applied: true,
         },
       });

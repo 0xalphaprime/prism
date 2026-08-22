@@ -1,5 +1,5 @@
 import { executeEvalCell } from "./run-cell";
-import { getEvalSet } from "./sets";
+import { getEvalSetLive } from "./sets-disk";
 import {
   createExperimentRecord,
   experimentProgress,
@@ -43,7 +43,7 @@ export async function stepExperiment(id: string): Promise<{
     return { record, stepped: false, progress: experimentProgress(record) };
   }
 
-  const set = getEvalSet(record.evalSetId);
+  const set = getEvalSetLive(record.evalSetId);
   const item = set?.items.find((i) => i.id === pending.itemId);
   if (!item) throw new Error(`Missing eval item ${pending.itemId}`);
 

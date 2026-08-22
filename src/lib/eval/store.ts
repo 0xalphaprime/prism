@@ -3,7 +3,8 @@ import path from "node:path";
 import { hashJson } from "@/lib/hash";
 import { newId } from "@/lib/id";
 import { architectureFingerprint } from "./graphs";
-import { evalSetHash, getEvalSet, itemContextHash, runnableItems } from "./sets";
+import { evalSetHash, itemContextHash, runnableItems } from "./sets";
+import { getEvalSetLive } from "./sets-disk";
 import type {
   EvalArchitectureId,
   ExperimentCell,
@@ -64,7 +65,7 @@ export function createExperimentRecord(args: {
   profile?: ExperimentProfile;
   name?: string;
 }): ExperimentRecord {
-  const set = getEvalSet(args.evalSetId);
+  const set = getEvalSetLive(args.evalSetId);
   if (!set) throw new Error(`Unknown eval set: ${args.evalSetId}`);
   const items = runnableItems(set);
   if (!items.length) {
