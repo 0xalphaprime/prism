@@ -47,7 +47,7 @@ export function ContextNode({ data, selected }: NodeProps<ContextNodeType>) {
       <ContextCountFooter
         count={count}
         href="/context"
-        empty="Nothing attached yet — open the workspace to gather context."
+        empty="Nothing attached yet — open the pack to gather context."
       >
         {attached.map((item) => (
           <li key={`${item.id}-${item.attachedAt}`}>

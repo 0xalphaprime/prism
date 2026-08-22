@@ -2430,6 +2430,84 @@ a.btn {
   max-height: 280px;
 }
 
+.context-workspace-add {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.context-workspace-add > h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.context-workspace-add-grid {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.context-workspace-card.is-airtable {
+  border-color: var(--line-strong);
+}
+
+.context-workspace-more {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 1rem 1rem;
+  display: grid;
+  gap: 0.75rem;
+  background: var(--bg-panel);
+}
+
+.context-workspace-more > summary {
+  cursor: pointer;
+  font-weight: 650;
+  color: var(--ink-soft);
+}
+
+.airtable-intake .field {
+  margin-bottom: 0.4rem;
+}
+
+.airtable-intake select {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--ink);
+  padding: 0.4rem 0.5rem;
+}
+
+.airtable-record-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.airtable-record-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+  align-items: start;
+  cursor: pointer;
+}
+
+.airtable-record-row strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.airtable-record-row em {
+  display: block;
+  font-style: normal;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
 .trace-layout {
   display: grid;
   grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);

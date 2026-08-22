@@ -3,7 +3,7 @@
 **Audience.** Builders using Prism as a mixture-of-agents (MoA) laboratory.  
 **Companion.** Deep paper notes live in [`RESEARCH.md`](../RESEARCH.md). This guide is product-first.  
 **Tagline.** *Only variety can absorb variety.* — W. Ross Ashby  
-**Last updated.** 2026-08-21
+**Last updated.** 2026-08-22
 
 ---
 
@@ -58,7 +58,7 @@ Around the graph:
 | **Drag handles** | Rewire edges (Hub is default; late inject allowed) |
 | **Delete** | Remove selected tile (+ edges); last Context Hub protected |
 | **Prompt** (`/prompt`) | Architecture-level *run intent* for the whole pathway |
-| **Context** (`/context`) | Attach and manage payloads for each channel |
+| **Context** (`/context`) | This run’s pack — Hub notes + attachments (Airtable, files, URLs); Hub packs it on Step / Run all |
 | **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
 | **Trace** (`/trace`) | Product report — Scan / Engineer, spine jump, who each hop saw, Judge chips, Copy all + export menu |
 | **Eval** (`/eval`) | Frozen questions × isolated architectures × scored comparison |
@@ -236,7 +236,7 @@ RUNTIME     →  explicit graph state, inspectable artifacts
 Recommended first path:
 
 1. **Add tile** — place agents, Split, Judge, and/or context channels; wire with drag handles.
-2. **Attach payloads** in **Context** (`/context`) — footers show `Context (N)`.
+2. **Attach payloads** in **Context** (`/context`) — that page is **this run’s pack**. Add notes, files, URLs, or **Airtable** records (pick a base and table). Hub footers show `Pack (N)`.
 3. Set the architecture **Prompt** (`/prompt`) — the run intent.
 4. **Select** a tile → **Expand** (or double-click); fill **Label**, **Role**, **Steer**, **Model**, **Prompt**, and **Controls** as needed. **Open output** for artifacts. **Delete** tiles you no longer want.
 5. **Clean layout** if tiles overlap; **Save architecture**.
@@ -259,6 +259,14 @@ Nemo talks to Foundry via `OLLAMA_BASE_URL` (`http://100.78.81.94:11434/v1`). If
 If the graph grid is empty over a Tailscale URL, Next blocked the client JS — hard-refresh after `allowedDevOrigins` includes that host (see README).
 
 Talk bar examples that mutate the same graph: `add a summarizer before the judge`, `use the cheaper model on research`.
+
+### Add context for a run
+
+1. Open **Context**. Hub notes sit at the top; **Attached** is what the next Step / Run all will pack.
+2. Under **Add**, use **Airtable** — Verify now if the card asks, then pick a **base** and **table**, check records, **Add to this run**. Do not look for an APIs tile or a Knowledge scavenger hunt.
+3. Hub on the canvas shows **Pack (N)**. **Run all** → Trace: Hub named ingest includes those records, not just Hub notes.
+
+Skills, GitHub, and Knowledge Cards (Notion) stay under **More channels**.
 
 ### Eval Lab
 
@@ -335,7 +343,7 @@ The extreme end-state: define a pathway once, fan many instances with controlled
 | Split | `router` kind |
 | Researcher / Writer / Critic / … | `agent` kind |
 | Judge | `merge` kind |
-| Context (N) footer | Attachments for that channel / hub |
+| Pack (N) footer | Attachments for that channel / hub; empty Hub says Open pack |
 | Prompt (architecture bar) | Architecture run intent |
 | Clean layout | Re-spread vertical MoA spine |
 | Log checkpoint | Run history stub |
