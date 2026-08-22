@@ -12,7 +12,7 @@ type ContextCountFooterProps = {
 
 const CLOSE_DELAY_MS = 220;
 
-/** Context (N) control with a hover popover that stays open while moving to scroll. */
+/** Pack (N) control with a hover popover that stays open while moving to scroll. */
 export function ContextCountFooter({
   count,
   href,
@@ -61,7 +61,7 @@ export function ContextCountFooter({
         className={`context-source-footer ${count > 0 ? "is-active" : ""}`}
         onFocus={show}
       >
-        Context ({count})
+        {count === 0 ? "Open pack" : `Pack (${count})`}
       </Link>
       <div
         className="context-source-popover"
@@ -75,7 +75,7 @@ export function ContextCountFooter({
           <ul className="context-source-popover-list nowheel">{children}</ul>
         )}
         <Link href={href} className="context-source-popover-link">
-          Manage in workspace
+          Open pack
         </Link>
       </div>
     </div>

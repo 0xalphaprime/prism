@@ -57,7 +57,7 @@ A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) an
 ## What you can do now
 
 1. Load **Starter MoA** (or click **Student vs teachers**)
-2. Set architecture **Prompt** (run intent) — optional: attach payloads in **Context**
+2. Set architecture **Prompt** (run intent) — optional: open **Context** and add notes, files, URLs, or Airtable records to this run’s pack
 3. Tune **Role**, **Steer**, **Model**, and node **Prompt** on tiles (select → **Expand**)
 4. **Run all** (or **Step** one hop) — Prism jumps to **Trace**
 5. Scan the spine (who saw whom), then **Export** if you want a pack for another chat or a training loop

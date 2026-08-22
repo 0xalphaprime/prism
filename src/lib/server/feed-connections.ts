@@ -395,6 +395,128 @@ function fieldString(fields: Record<string, unknown>, keys: string[]) {
   return "";
 }
 
+export type AirtableBase = { id: string; name: string };
+export type AirtableTable = { id: string; name: string };
+
+function airtablePat() {
+  return process.env.AIRTABLE_PAT ?? "";
+}
+
+function airtableHeaders() {
+  return { Authorization: `Bearer ${airtablePat()}` };
+}
+
+function requireAirtablePat() {
+  const pat = airtablePat();
+  if (!pat) throw new Error("Add AIRTABLE_PAT to .env.local");
+  return pat;
+}
+
+async function airtableJson<T>(url: string): Promise<T> {
+  requireAirtablePat();
+  const res = await fetch(url, {
+    headers: airtableHeaders(),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text.slice(0, 200) || `Airtable HTTP ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
+export async function listAirtableBases(): Promise<AirtableBase[]> {
+  const data = await airtableJson<{ bases?: AirtableBase[] }>(
+    "https://api.airtable.com/v0/meta/bases",
+  );
+  return data.bases ?? [];
+}
+
+export async function listAirtableTables(baseId: string): Promise<AirtableTable[]> {
+  const data = await airtableJson<{
+    tables?: Array<{ id: string; name: string }>;
+  }>(`https://api.airtable.com/v0/meta/bases/${encodeURIComponent(baseId)}/tables`);
+  return (data.tables ?? []).map((t) => ({ id: t.id, name: t.name }));
+}
+
+function stringifyAirtableValue(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => {
+        if (typeof entry === "string") return entry;
+        if (typeof entry === "number") return String(entry);
+        if (
+          entry &&
+          typeof entry === "object" &&
+          "name" in entry &&
+          typeof (entry as { name: unknown }).name === "string"
+        ) {
+          return (entry as { name: string }).name;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "";
+}
+
+function recordPackText(fields: Record<string, unknown>): string {
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(fields)) {
+    const text = stringifyAirtableValue(value);
+    if (text) lines.push(`${key}: ${text}`);
+  }
+  return lines.join("\n").slice(0, 4000);
+}
+
+export async function listAirtableRecords(args: {
+  baseId: string;
+  tableId: string;
+  tableName?: string;
+  query?: string;
+}): Promise<ListedContextItem[]> {
+  const { baseId, tableId, tableName, query } = args;
+  const params = new URLSearchParams({ maxRecords: "40" });
+  const data = await airtableJson<{
+    records?: Array<{ id: string; fields: Record<string, unknown> }>;
+  }>(
+    `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableId)}?${params}`,
+  );
+  const q = query?.trim().toLowerCase() ?? "";
+  const label = tableName || tableId;
+  const items: ListedContextItem[] = [];
+  for (const rec of data.records ?? []) {
+    const title =
+      fieldString(rec.fields, ["Name", "Title", "Card", "Topic", "Account"]) ||
+      rec.id;
+    const excerpt = recordPackText(rec.fields);
+    if (
+      q &&
+      !title.toLowerCase().includes(q) &&
+      !excerpt.toLowerCase().includes(q)
+    ) {
+      continue;
+    }
+    items.push({
+      id: `airtable-${baseId}-${rec.id}`,
+      title,
+      subtitle: `Airtable · ${label}`,
+      excerpt,
+      meta: {
+        source: "airtable",
+        baseId,
+        tableId,
+        tableName: label,
+        recordId: rec.id,
+      },
+    });
+  }
+  return items;
+}
+
 /**
  * Knowledge Cards live in Notion (`KNOWLEDGE_CARDS` URL).
  * Airtable sales/mgmt bases are NOT knowledge — never fall back to their first table
