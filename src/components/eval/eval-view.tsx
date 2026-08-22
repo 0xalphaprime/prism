@@ -63,8 +63,11 @@ export function EvalView() {
   const [busy, setBusy] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [importText, setImportText] = useState("");
+  const [importNote, setImportNote] = useState<string | null>(null);
   const [openPair, setOpenPair] = useState<string | null>(null);
   const pauseRef = useRef(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +100,49 @@ export function EvalView() {
   }, []);
 
   const selectedSet = catalog?.sets.find((s) => s.id === evalSetId);
+
+  const refreshCatalog = async () => {
+    const catalogRes = await fetch("/api/eval/sets");
+    const catalogData = (await catalogRes.json()) as Catalog;
+    setCatalog(catalogData);
+  };
+
+  const importSigned = async () => {
+    const raw = importText.trim();
+    if (!raw || busy) return;
+    setBusy(true);
+    setError(null);
+    setImportNote(null);
+    try {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw) as unknown;
+      } catch {
+        throw new Error("Paste a signed EvalItem JSON object.");
+      }
+      const res = await fetch("/api/eval/sets/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        runnable?: number;
+        total?: number;
+        item?: { id: string };
+      };
+      if (!res.ok) throw new Error(data.error || "Import failed");
+      await refreshCatalog();
+      setImportText("");
+      setImportNote(
+        `Imported ${data.item?.id ?? "item"} · ${data.runnable}/${data.total} runnable`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const create = async () => {
     setBusy(true);
@@ -258,11 +304,55 @@ export function EvalView() {
         </fieldset>
         {selectedSet ? (
           <p className="sheet-help">
-            Phase 1 scores only items with prompt + gold/bits.{" "}
+            Phase 1 scores only items with prompt + allowedContext.{" "}
             {selectedSet.runnable} runnable of {selectedSet.total}. Scaffolds
             stay in the set so the matrix shape is real.
           </p>
         ) : null}
+        <div className="eval-import">
+          <label>
+            Import signed item
+            <textarea
+              className="eval-import-input"
+              rows={6}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder='Paste one signed EvalItem JSON (id must already exist in the set).'
+              disabled={busy || running}
+            />
+          </label>
+          <div className="eval-import-actions">
+            <input
+              ref={importFileRef}
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                setImportText(await file.text());
+              }}
+            />
+            <button
+              type="button"
+              className="btn"
+              disabled={busy || running}
+              onClick={() => importFileRef.current?.click()}
+            >
+              Choose file
+            </button>
+            <button
+              type="button"
+              className="btn btn-accent"
+              disabled={busy || running || !importText.trim()}
+              onClick={() => void importSigned()}
+            >
+              Import signed item
+            </button>
+          </div>
+          {importNote ? <p className="sheet-help">{importNote}</p> : null}
+        </div>
         <div className="eval-actions">
           <button type="button" className="btn btn-accent" onClick={() => void create()} disabled={busy || running}>
             {busy ? "Creating…" : "Create experiment"}

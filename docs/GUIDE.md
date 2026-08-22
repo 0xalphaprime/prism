@@ -60,6 +60,7 @@ Around the graph:
 | **Prompt** (`/prompt`) | Architecture-level *run intent* for the whole pathway |
 | **Context** (`/context`) | This run’s pack — Hub notes + attachments (Airtable, files, URLs); Hub packs it on Step / Run all |
 | **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
+| **New architecture** (`/build`) | Builder agent — type an archetype; the lab emits a graph |
 | **Trace** (`/trace`) | Product report — Scan / Engineer, spine jump, who each hop saw, Judge chips, Copy all + export menu |
 | **Eval** (`/eval`) | Frozen questions × isolated architectures × scored comparison |
 | **Talk** | Natural-language edits that land on the same graph |
@@ -235,7 +236,7 @@ RUNTIME     →  explicit graph state, inspectable artifacts
 
 Recommended first path:
 
-1. **Add tile** — place agents, Split, Judge, and/or context channels; wire with drag handles.
+1. **New architecture** — describe the archetype (debate, Starter MoA, Student vs teachers, …). Builder steers a specialist that emits the graph. Or **Add tile** and wire by hand; **More → Template…** for canned pathways; **More → Blank starter** for a Starter MoA clone without the LLM.
 2. **Attach payloads** in **Context** (`/context`) — that page is **this run’s pack**. Add notes, files, URLs, or **Airtable** records (pick a base and table). Hub footers show `Pack (N)`.
 3. Set the architecture **Prompt** (`/prompt`) — the run intent.
 4. **Select** a tile → **Expand** (or double-click); fill **Label**, **Role**, **Steer**, **Model**, **Prompt**, and **Controls** as needed. **Open output** for artifacts. **Delete** tiles you no longer want.
@@ -260,10 +261,19 @@ If the graph grid is empty over a Tailscale URL, Next blocked the client JS — 
 
 Talk bar examples that mutate the same graph: `add a summarizer before the judge`, `use the cheaper model on research`.
 
+### New architecture (Builder)
+
+1. Click **New architecture** on the bar (or open `/build`).
+2. Type the archetype — “parallel debate on X”, “SMoA with three specialists”, “Student vs teachers”, or freeform.
+3. **Build graph**. The Builder agent (Role + Steer, JSON contract) returns a Hub / specialists / Judge DAG. It lands as a new library item; you return to the canvas.
+4. Tune Role / Steer / models on tiles, set **Prompt**, then Step / Run all as usual.
+
+Needs a working Connections channel (default Builder model is Grok 4.6 via OpenRouter). **More → Blank starter** still clones Starter MoA with no LLM. Talk stays in-place mutations, not new graphs.
+
 ### Add context for a run
 
 1. Open **Context**. Hub notes sit at the top; **Attached** is what the next Step / Run all will pack.
-2. Under **Add**, use **Airtable** — Verify now if the card asks, then pick a **base** and **table**, check records, **Add to this run**. Do not look for an APIs tile or a Knowledge scavenger hunt.
+2. Under **Add**, use **Airtable** — Verify now if the card asks, then pick a **base** and a **table** (or **All tables**), check records, **Add to this run**. Do not look for an APIs tile or a Knowledge scavenger hunt.
 3. Hub on the canvas shows **Pack (N)**. **Run all** → Trace: Hub named ingest includes those records, not just Hub notes.
 
 Skills, GitHub, and Knowledge Cards (Notion) stay under **More channels**.
@@ -286,7 +296,18 @@ Isolation is per-architecture:
 - Eval teacher refine: Teacher **must** see first Nemo.
 - Eval teacher+critic second hop: Nemo **must not** ingest Teacher/Critic prose.
 
-Frozen set: [`data/eval/prime-leftovers.v1.json`](../data/eval/prime-leftovers.v1.json). Phase 1 scores `missing-fact-8`; other items are tagged scaffolds until Foundry notes fill `goldFacts` / `bits`.
+Frozen set: [`data/eval/prime-leftovers.v1.json`](../data/eval/prime-leftovers.v1.json). Ingest is **Import signed item** on `/eval` (or a dual-write into that JSON) after Alex signs. Do not invent gold.
+
+Eval cell contract (do not “improve” this with Knowledge / Skills / Airtable):
+
+```
+Eval cell Hub content = item.allowedContext
+Eval cell run intent  = item.prompt
+No attachedContext
+Do not reuse Student vs teachers / Starter MoA for the matrix
+```
+
+The three isolated graphs are `eval-baseline`, `eval-teacher-refine`, `eval-teacher-critic`. First host run (when Alex says go): signed items × those three × 1 × 0.4.
 
 Queue: pick set, architectures, reps, temperature → **Create experiment** → **Run experiment**. One Foundry/Ollama student job at a time. Headless — the canvas is not swapped.
 
@@ -313,7 +334,7 @@ Fork → fill context slots → re-run → compare. Hosted runs (later) can debi
 
 | Horizon | What ships |
 |---------|------------|
-| **Now** | Graph chrome, **Trace** as product, **Eval Lab** (frozen set × 3 isolated graphs × binary scores), Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
+| **Now** | Graph chrome, **Builder** (archetype → graph), **Trace** as product, **Eval Lab** (frozen set × 3 isolated graphs × binary scores), Expand + Controls, tile CRUD, **Step / Run all**, Split route plans, live run records |
 | **Next** | LLM-as-judge scoring; leftover gold fill; cloud fan-out; publish export UI |
 | **Later** | Gallery / fork; optional account balance for hosted inference; **many parallel instances** of one pathway for extreme sweeps |
 
@@ -345,6 +366,7 @@ The extreme end-state: define a pathway once, fan many instances with controlled
 | Judge | `merge` kind |
 | Pack (N) footer | Attachments for that channel / hub; empty Hub says Open pack |
 | Prompt (architecture bar) | Architecture run intent |
+| New architecture | Builder agent (`/build`) — archetype → graph |
 | Clean layout | Re-spread vertical MoA spine |
 | Log checkpoint | Run history stub |
 | Trace (`/trace`) | Product report: Scan/Engineer, saw/isolation, Judge chips; Copy all + attribution + causal |

@@ -17,7 +17,7 @@ Prism harnesses complexity by giving the system enough structured variety — ro
 
 ## Status
 
-**Ships today:** graph chrome (Add tile / Delete / rewire, Expand workspace, presets), architectures (save / template / export), Connections + provider verify, **Step / Run all**, **Trace** (Scan / Engineer, isolation chips, Copy all + export), **Eval Lab** (frozen leftovers × isolated graphs × scored report), starter MoA and **Student vs teachers** (Hub-only Nemo + teachers → Judge → second Nemo).
+**Ships today:** graph chrome (Add tile / Delete / rewire, Expand workspace, presets), **Builder** (type an archetype → graph), architectures (save / template / export), Connections + provider verify, **Step / Run all**, **Trace** (Scan / Engineer, isolation chips, Copy all + export), **Eval Lab** (frozen leftovers × isolated graphs × scored report), starter MoA and **Student vs teachers** (Hub-only Nemo + teachers → Judge → second Nemo).
 
 This is an early lab release. Expect sharp edges; issues and PRs welcome.
 
@@ -56,7 +56,7 @@ A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) an
 
 ## What you can do now
 
-1. Load **Starter MoA** (or click **Student vs teachers**)
+1. **New architecture** — type the archetype; Builder emits the graph. Or load **Starter MoA** / **Student vs teachers**
 2. Set architecture **Prompt** (run intent) — optional: open **Context** and add notes, files, URLs, or Airtable records to this run’s pack
 3. Tune **Role**, **Steer**, **Model**, and node **Prompt** on tiles (select → **Expand**)
 4. **Run all** (or **Step** one hop) — Prism jumps to **Trace**

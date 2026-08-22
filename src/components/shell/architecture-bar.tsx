@@ -153,6 +153,14 @@ export function ArchitectureBar() {
           {dirty ? "Saving…" : "Saved"}
         </span>
 
+        <Link
+          href="/build"
+          className="btn btn-accent"
+          title="Describe an archetype — Builder emits the graph"
+        >
+          New architecture
+        </Link>
+
         <button
           type="button"
           className="btn btn-accent"
@@ -234,14 +242,14 @@ export function ArchitectureBar() {
                 className="btn"
                 onClick={() => {
                   const name = window.prompt(
-                    "New architecture name:",
+                    "Blank starter name:",
                     `Architecture ${architectures.length + 1}`,
                   );
                   if (name !== null) createArchitecture(name || undefined);
                   closeMore();
                 }}
               >
-                New
+                Blank starter
               </button>
               <button
                 type="button"

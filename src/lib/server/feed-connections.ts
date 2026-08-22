@@ -478,14 +478,21 @@ export type AirtableRecordPage = {
 };
 
 const AIRTABLE_RECORD_CAP = 200;
+/** Sentinel table id — fetch every table in the base (still capped). */
+export const AIRTABLE_ALL_TABLES = "all";
 
 export async function listAirtableRecords(args: {
   baseId: string;
   tableId: string;
   tableName?: string;
   query?: string;
+  limit?: number;
 }): Promise<AirtableRecordPage> {
   const { baseId, tableId, tableName, query } = args;
+  const cap = Math.min(
+    Math.max(1, args.limit ?? AIRTABLE_RECORD_CAP),
+    AIRTABLE_RECORD_CAP,
+  );
   const q = query?.trim().toLowerCase() ?? "";
   const label = tableName || tableId;
   const items: ListedContextItem[] = [];
@@ -526,13 +533,47 @@ export async function listAirtableRecords(args: {
           recordId: rec.id,
         },
       });
-      if (items.length >= AIRTABLE_RECORD_CAP) {
+      if (items.length >= cap) {
         truncated = true;
         break;
       }
     }
     offset = truncated ? undefined : data.offset;
   } while (offset);
+
+  return { items, truncated };
+}
+
+/** Walk every table in a base until the record cap. */
+export async function listAirtableRecordsAcrossTables(args: {
+  baseId: string;
+  query?: string;
+}): Promise<AirtableRecordPage> {
+  const tables = await listAirtableTables(args.baseId);
+  const items: ListedContextItem[] = [];
+  let truncated = false;
+
+  for (let i = 0; i < tables.length; i += 1) {
+    const remaining = AIRTABLE_RECORD_CAP - items.length;
+    if (remaining <= 0) {
+      truncated = true;
+      break;
+    }
+    const table = tables[i];
+    if (!table) continue;
+    const page = await listAirtableRecords({
+      baseId: args.baseId,
+      tableId: table.id,
+      tableName: table.name,
+      query: args.query,
+      limit: remaining,
+    });
+    items.push(...page.items);
+    if (page.truncated || items.length >= AIRTABLE_RECORD_CAP) {
+      truncated = true;
+      break;
+    }
+  }
 
   return { items, truncated };
 }

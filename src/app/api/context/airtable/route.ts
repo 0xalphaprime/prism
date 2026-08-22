@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
+  AIRTABLE_ALL_TABLES,
   listAirtableBases,
   listAirtableRecords,
+  listAirtableRecordsAcrossTables,
   listAirtableTables,
 } from "@/lib/server/feed-connections";
 
@@ -28,6 +30,13 @@ export async function GET(request: Request) {
     if (!tableId) {
       const tables = await listAirtableTables(baseId);
       return NextResponse.json({ tables });
+    }
+    if (tableId === AIRTABLE_ALL_TABLES) {
+      const page = await listAirtableRecordsAcrossTables({
+        baseId,
+        query: q,
+      });
+      return NextResponse.json(page);
     }
     if (!TABLE_ID.test(tableId)) {
       return NextResponse.json({ error: "Invalid table id" }, { status: 400 });
