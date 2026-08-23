@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { experimentItemIds } from "@/lib/eval/focus";
 import { createAndSaveExperiment } from "@/lib/eval/queue";
 import { experimentProgress, listExperiments } from "@/lib/eval/store";
 import {
@@ -21,6 +22,7 @@ export async function GET() {
       createdAt: exp.createdAt,
       updatedAt: exp.updatedAt,
       progress: experimentProgress(exp),
+      itemIds: experimentItemIds(exp),
     })),
   });
 }
