@@ -5,6 +5,7 @@ import { RunBar } from "@/components/run/run-bar";
 import { ArchitectureBar } from "@/components/shell/architecture-bar";
 import { BrandMark } from "@/components/shell/brand-mark";
 import { IdentityChip } from "@/components/shell/identity-chip";
+import { ModeChip } from "@/components/shell/mode-chip";
 import { TalkBar } from "@/components/talk/talk-bar";
 
 export function LabShell({ children }: { children: ReactNode }) {
@@ -18,7 +19,10 @@ export function LabShell({ children }: { children: ReactNode }) {
             Only variety can absorb variety.
           </p>
         </div>
-        <IdentityChip />
+        <div className="brand-actions">
+          <ModeChip href="/eval" label="Eval" title="Switch to Eval mode" />
+          <IdentityChip />
+        </div>
       </header>
 
       <ArchitectureBar />

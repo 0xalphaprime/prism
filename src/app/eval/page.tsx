@@ -3,7 +3,7 @@ import { SecondaryShell } from "@/components/shell/secondary-shell";
 
 export default function EvalPage() {
   return (
-    <SecondaryShell title="Eval Lab">
+    <SecondaryShell title="Eval mode">
       <EvalView />
     </SecondaryShell>
   );

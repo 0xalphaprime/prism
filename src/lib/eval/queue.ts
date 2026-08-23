@@ -9,12 +9,22 @@ import {
 } from "./store";
 import type { EvalArchitectureId, ExperimentProfile, ExperimentRecord } from "./types";
 
+const inflight = new Map<
+  string,
+  Promise<{
+    record: ExperimentRecord;
+    stepped: boolean;
+    progress: ReturnType<typeof experimentProgress>;
+  }>
+>();
+
 export async function createAndSaveExperiment(args: {
   evalSetId: string;
   architectureIds: EvalArchitectureId[];
   reps?: number;
   profile?: ExperimentProfile;
   name?: string;
+  itemIds?: string[];
 }): Promise<ExperimentRecord> {
   const record = createExperimentRecord(args);
   await writeExperiment(record);
@@ -26,9 +36,23 @@ export async function stepExperiment(id: string): Promise<{
   stepped: boolean;
   progress: ReturnType<typeof experimentProgress>;
 }> {
+  const existing = inflight.get(id);
+  if (existing) return existing;
+  const run = stepOnce(id).finally(() => inflight.delete(id));
+  inflight.set(id, run);
+  return run;
+}
+
+async function stepOnce(id: string): Promise<{
+  record: ExperimentRecord;
+  stepped: boolean;
+  progress: ReturnType<typeof experimentProgress>;
+}> {
   const record = await readExperiment(id);
   if (!record) throw new Error("Experiment not found");
-  const pending = nextPendingCell(record);
+  const pending =
+    nextPendingCell(record) ??
+    record.cells.find((cell) => cell.status === "running");
   if (!pending) {
     const doneStatus =
       record.cells.some((c) => c.status === "error") &&

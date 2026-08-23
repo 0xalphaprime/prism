@@ -1,6 +1,6 @@
 import type { ExperimentRecord } from "./types";
 
-/** Leftover currently on the lab floor. */
+/** Card currently on the lab floor. */
 export function activeItemId(record: ExperimentRecord): string | undefined {
   const running = record.cells.find((cell) => cell.status === "running");
   if (running) return running.itemId;
@@ -15,7 +15,7 @@ export function activeItemId(record: ExperimentRecord): string | undefined {
   return undefined;
 }
 
-/** Same experiment, cells for one leftover only. Disk record is unchanged. */
+/** Same experiment, cells for one card only. Disk record is unchanged. */
 export function focusExperiment(
   record: ExperimentRecord,
   itemId: string,
