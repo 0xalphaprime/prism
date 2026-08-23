@@ -120,9 +120,11 @@ export function ArchitectureBar() {
             ‹
           </button>
           <select
-            className="architecture-select"
+            className="architecture-select architecture-select-active"
             value={active.id}
             onChange={(e) => selectArchitecture(e.target.value)}
+            aria-label="Architecture"
+            title="Switch architecture"
           >
             {architectures.map((arch) => (
               <option key={arch.id} value={arch.id}>
@@ -141,14 +143,6 @@ export function ArchitectureBar() {
           </button>
         </div>
 
-        <input
-          className="architecture-name"
-          value={active.name}
-          onChange={(e) => renameArchitecture(e.target.value)}
-          aria-label="Architecture name"
-          title="Name this graph architecture"
-        />
-
         <span className={`architecture-dirty ${dirty ? "is-dirty" : ""}`}>
           {dirty ? "Saving…" : "Saved"}
         </span>
@@ -160,31 +154,19 @@ export function ArchitectureBar() {
         >
           New architecture
         </Link>
-
-        <button
-          type="button"
-          className="btn btn-accent"
-          onClick={openStudentTeachers}
-          title="Open Hub → Nemo + teachers → Judge → second Nemo"
-        >
-          Student vs teachers
-        </button>
+        <Link href="/prompt" className="btn btn-accent">
+          Prompt
+        </Link>
+        <Link href="/context" className="btn btn-accent">
+          Context
+        </Link>
 
         <div className="architecture-actions">
-          <Link href="/prompt" className="btn btn-accent">
-            Prompt
-          </Link>
           <Link href="/connections" className="btn">
             Connections
           </Link>
-          <Link href="/context" className="btn btn-accent">
-            Context
-          </Link>
           <Link href="/trace" className="btn btn-accent">
             Trace ({active.runs.length})
-          </Link>
-          <Link href="/eval" className="btn btn-accent">
-            Eval
           </Link>
 
           <details ref={moreRef} className="architecture-more">
@@ -213,6 +195,17 @@ export function ArchitectureBar() {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  const name = window.prompt("Rename architecture:", active.name);
+                  if (name !== null) renameArchitecture(name.trim() || active.name);
+                  closeMore();
+                }}
+              >
+                Rename
+              </button>
               <button
                 type="button"
                 className="btn"

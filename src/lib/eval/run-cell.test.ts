@@ -5,7 +5,7 @@ import { STUDENT_NODE_ID } from "@/lib/student-graph";
 import { firehoseHits } from "./firehose";
 import { cloneEvalGraph, EVAL_INFORMED_ID } from "./graphs";
 import { EVAL_ATTACHED_CONTEXT, seedEvalCellGraph } from "./run-cell";
-import { runnableItems } from "./sets";
+import { runnableItems, pickRunnableItems } from "./sets";
 import type { EvalItem, EvalSet } from "./types";
 import { EVAL_SET_FILE_KIND } from "./types";
 
@@ -113,6 +113,51 @@ describe("runnableItems", () => {
     assert.deepEqual(
       runnableItems(set).map((row) => row.id),
       ["fixture-1"],
+    );
+  });
+
+  it("pickRunnableItems only queues requested ids, in that order", () => {
+    const set: EvalSet = {
+      kind: EVAL_SET_FILE_KIND,
+      schemaVersion: 1,
+      id: "prime-leftovers.v1",
+      name: "test",
+      description: "",
+      items: [item, { ...item, id: "card-2" }, { ...item, id: "card-3" }],
+    };
+    assert.deepEqual(
+      pickRunnableItems(set, ["card-3", "card-2"]).map((row) => row.id),
+      ["card-3", "card-2"],
+    );
+  });
+
+  it("pickRunnableItems refuses an empty queue", () => {
+    const set: EvalSet = {
+      kind: EVAL_SET_FILE_KIND,
+      schemaVersion: 1,
+      id: "prime-leftovers.v1",
+      name: "test",
+      description: "",
+      items: [item],
+    };
+    assert.throws(
+      () => pickRunnableItems(set, []),
+      /Import at least one signed item/,
+    );
+  });
+
+  it("pickRunnableItems refuses ids that are not runnable", () => {
+    const set: EvalSet = {
+      kind: EVAL_SET_FILE_KIND,
+      schemaVersion: 1,
+      id: "prime-leftovers.v1",
+      name: "test",
+      description: "",
+      items: [item],
+    };
+    assert.throws(
+      () => pickRunnableItems(set, ["missing-card"]),
+      /not runnable yet/,
     );
   });
 });

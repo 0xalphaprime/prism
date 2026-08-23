@@ -34,6 +34,7 @@ export async function POST(request: Request) {
     reps?: number;
     profile?: ExperimentProfile;
     name?: string;
+    itemIds?: string[];
   };
   try {
     body = (await request.json()) as typeof body;
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
       reps: body.reps,
       profile: body.profile,
       name: body.name,
+      itemIds: Array.isArray(body.itemIds)
+        ? body.itemIds.filter((id): id is string => typeof id === "string" && Boolean(id.trim()))
+        : [],
     });
     return NextResponse.json({ experiment: record, progress: experimentProgress(record) });
   } catch (error) {

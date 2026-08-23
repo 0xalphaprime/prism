@@ -89,7 +89,7 @@ describe("activeItemId", () => {
 });
 
 describe("focusExperiment", () => {
-  it("drops cells for other leftover ids", () => {
+  it("drops cells for other card ids", () => {
     const exp = record([
       cell("card-1", "eval-baseline", "done"),
       cell("card-2", "eval-baseline", "idle"),

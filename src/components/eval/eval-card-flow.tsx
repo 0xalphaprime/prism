@@ -1,5 +1,6 @@
 "use client";
 
+import { CopyButton } from "@/components/run/copy-button";
 import Link from "next/link";
 import {
   beforeAfterPairs,
@@ -8,6 +9,7 @@ import {
   winnerLine,
 } from "@/lib/eval/stats";
 import { buildDecisionNotes } from "@/lib/eval/decision";
+import { cardTranscript } from "@/lib/eval/transcript";
 import type {
   EvalArchitectureId,
   EvalItem,
@@ -39,9 +41,18 @@ export function EvalCardFlow({
   return (
     <>
       <section className="eval-card">
-        <h2>Current card</h2>
-        <p className="eval-card-id">{itemId ?? "—"}</p>
-        <p className="eval-flow-prompt">{item?.prompt?.trim() || "No prompt on this leftover."}</p>
+        <div className="eval-card-head">
+          <div>
+            <h2>Current card</h2>
+            <p className="eval-card-id">{itemId ?? "—"}</p>
+          </div>
+          <CopyButton
+            label="Copy all output"
+            text={cardTranscript(focused, item)}
+            title="Copy this card’s prompt, hops, and exhaust"
+          />
+        </div>
+        <p className="eval-flow-prompt">{item?.prompt?.trim() || "No prompt on this card."}</p>
       </section>
 
       <section className="eval-card">

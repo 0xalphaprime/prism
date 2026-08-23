@@ -96,7 +96,7 @@ export function buildDecisionNotes(record: ExperimentRecord): string[] {
   }
 
   if (!notes.length) {
-    notes.push("Not enough scored cells for a decision yet. Fill leftover gold/bits, then re-run.");
+    notes.push("Not enough scored cells for a decision yet. Fill gold/bits, then re-run.");
   }
   return notes;
 }

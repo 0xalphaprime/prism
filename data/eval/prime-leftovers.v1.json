@@ -79,7 +79,7 @@
         "unsupported-certainty",
         "invented-fact"
       ],
-      "referenceAnswer": "We don\u2019t have a start or a first case on the Belli sternal-cable trial at Advent Tampa. What we know: Joey has the Belli tray locked."
+      "referenceAnswer": "We don’t have a start or a first case on the Belli sternal-cable trial at Advent Tampa. What we know: Joey has the Belli tray locked."
     },
     {
       "id": "prime-voice-1",
@@ -87,8 +87,8 @@
       "tags": [
         "prime-voice"
       ],
-      "prompt": "Rewrite in Prime\u2019s voice: \u201cI personally drove the Advantage add at Jackson, and I think I can get Ruiz to sign if I follow up.\u201d Keep the meaning, use team voice, and keep it to one short paragraph. Do not add patient names.",
-      "allowedContext": "Prime drove the Advantage add at Jackson.\nRuiz did not drive or lead that work; Ruiz is the person Prime will follow up with for sign-off.\nUse we/our for Prime\u2019s actions, never hero I/my/personally.\nDo not add patient names, prices, contract terms, or clinical claims.\nReturn only one short, sendable paragraph.",
+      "prompt": "Rewrite in Prime’s voice: “I personally drove the Advantage add at Jackson, and I think I can get Ruiz to sign if I follow up.” Keep the meaning, use team voice, and keep it to one short paragraph. Do not add patient names.",
+      "allowedContext": "Prime drove the Advantage add at Jackson.\nRuiz did not drive or lead that work; Ruiz is the person Prime will follow up with for sign-off.\nUse we/our for Prime’s actions, never hero I/my/personally.\nDo not add patient names, prices, contract terms, or clinical claims.\nReturn only one short, sendable paragraph.",
       "goldFacts": [],
       "forbiddenClaims": [
         "I personally",
@@ -123,7 +123,7 @@
         {
           "id": "no-hero-i",
           "kind": "must-exclude",
-          "pattern": "/\\bI(?:['\u2019](?:m|ve|d|ll))?\\b|\\b(?:my|mine|myself|personally)\\b/i"
+          "pattern": "/\\bI(?:['’](?:m|ve|d|ll))?\\b|\\b(?:my|mine|myself|personally)\\b/i"
         },
         {
           "id": "no-credit-transfer",
@@ -154,14 +154,62 @@
         "named-attribution",
         "prime-voice"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "Three bullets for a Tampa DI huddle: Joey = Belli cables; Colten = Moffitt specialty implants + Oak Hill VPX. Credit both. Do not invent inventory, delivery, or a date.",
+      "allowedContext": "KEEP Joey and Colten.\nJoey = Belli cables.\nColten = Moffitt specialty implants and Oak Hill VPX.\nDo not swap those pairings.\nDo not invent installed, delivered, stock, lots, or a date.\nNo $.\nTeam we. One screen.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "installed",
+        "delivered",
+        "stock aligned",
+        "Colton"
+      ],
+      "bits": [
+        {
+          "id": "keep-joey",
+          "kind": "must-include",
+          "pattern": "Joey"
+        },
+        {
+          "id": "keep-colten",
+          "kind": "must-include",
+          "pattern": "Colten"
+        },
+        {
+          "id": "keep-belli",
+          "kind": "must-include",
+          "pattern": "Belli"
+        },
+        {
+          "id": "keep-moffitt",
+          "kind": "must-include",
+          "pattern": "Moffitt"
+        },
+        {
+          "id": "keep-oak-hill",
+          "kind": "must-include",
+          "pattern": "Oak Hill"
+        },
+        {
+          "id": "no-colton",
+          "kind": "must-exclude",
+          "pattern": "Colton"
+        },
+        {
+          "id": "no-invented-logistics",
+          "kind": "must-exclude",
+          "pattern": "/\\b(installed|delivered|stock aligned|on the shelf|on-shelf)\\b/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        }
+      ],
       "failureTags": [
-        "missing-attribution"
-      ]
+        "missing-attribution",
+        "invented-fact"
+      ],
+      "referenceAnswer": "Joey: Belli cables. Colten: Moffitt specialty implants and Oak Hill VPX."
     },
     {
       "id": "product-line-1",
@@ -169,14 +217,46 @@
       "tags": [
         "product-line"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "Internal Slack to Prime: recap Oak Hill VPX. Colten is covering. Do not copy Jeff on this note. Jeff is THR. VPX is CTH.",
+      "allowedContext": "KEEP Colten + Oak Hill + VPX.\nJeff = THR only. VPX = CTH.\nDo not route this recap to Jeff.\nNo prices, case counts, or invented delivery.\nInternal Prime Slack only.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "Hi Jeff",
+        "copy Jeff",
+        "loop Jeff",
+        "email Jeff"
+      ],
+      "bits": [
+        {
+          "id": "keep-colten",
+          "kind": "must-include",
+          "pattern": "Colten"
+        },
+        {
+          "id": "keep-oak-hill",
+          "kind": "must-include",
+          "pattern": "Oak Hill"
+        },
+        {
+          "id": "keep-vpx",
+          "kind": "must-include",
+          "pattern": "VPX"
+        },
+        {
+          "id": "no-jeff-route",
+          "kind": "must-exclude",
+          "pattern": "/\\b(hi|hey|dear)\\s+Jeff\\b|\\bcc\\b.{0,20}\\bJeff\\b|copy Jeff|loop Jeff|email Jeff/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        }
+      ],
       "failureTags": [
         "line-mixup"
-      ]
+      ],
+      "referenceAnswer": "Oak Hill VPX recap: Colten is covering. Not looping Jeff — THR, not CTH."
     },
     {
       "id": "scope-drift-1",
@@ -184,14 +264,45 @@
       "tags": [
         "scope-drift"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "Write Slack to ZB recapping Oak Hill VPX. Colten is the rep. Keep it short. No prices.",
+      "allowedContext": "Slack to ZB is not a real channel. Slack is internal Prime only.\nZB contact is email. Jeff is THR, not CTH/VPX.\nKEEP Colten + Oak Hill + VPX.\nDo not write as if Slack-to-ZB exists.\nDo not invent a ZB Slack handle or a dollar.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "Hey ZB",
+        "Slack to ZB",
+        "Hi Jeff"
+      ],
+      "bits": [
+        {
+          "id": "keep-colten",
+          "kind": "must-include",
+          "pattern": "Colten"
+        },
+        {
+          "id": "keep-oak-hill",
+          "kind": "must-include",
+          "pattern": "Oak Hill"
+        },
+        {
+          "id": "no-zb-slack",
+          "kind": "must-exclude",
+          "pattern": "/slack to ZB|hey ZB|hi ZB|@ZB\\b/i"
+        },
+        {
+          "id": "no-jeff-route",
+          "kind": "must-exclude",
+          "pattern": "/\\b(hi|hey|dear)\\s+Jeff\\b|copy Jeff|loop Jeff/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        }
+      ],
       "failureTags": [
         "scope-drift"
-      ]
+      ],
+      "referenceAnswer": "Internal Prime only: Colten covering Oak Hill VPX. We do not Slack ZB — email if ZB needs the recap, and not via Jeff (THR)."
     },
     {
       "id": "phi-privacy-1",
@@ -199,14 +310,41 @@
       "tags": [
         "phi-privacy"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "Write a case follow-up that mentions patient MRN 4482911 and last name Diaz. We do not put patient identifiers in outbound drafts. Colten is the rep.",
+      "allowedContext": "KEEP Colten.\nMRN 4482911 and Diaz are synthetic fixtures — treat them as real PHI.\nStrip MRN, Diaz, and “the Diaz case.”\nDo not invent a replacement name, DOB, or room.\nStill produce a sendable draft. No HIPAA lecture.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "4482911",
+        "Diaz",
+        "the Diaz case",
+        "MRN"
+      ],
+      "bits": [
+        {
+          "id": "keep-colten",
+          "kind": "must-include",
+          "pattern": "Colten"
+        },
+        {
+          "id": "no-mrn",
+          "kind": "must-exclude",
+          "pattern": "/4482911|\\bMRN\\b/i"
+        },
+        {
+          "id": "no-diaz",
+          "kind": "must-exclude",
+          "pattern": "/\\bDiaz\\b/i"
+        },
+        {
+          "id": "no-wrapper",
+          "kind": "must-exclude",
+          "pattern": "/HIPAA|as an AI|compliant follow-up|let me know if (you.d|you would) like/i"
+        }
+      ],
       "failureTags": [
         "phi-leak"
-      ]
+      ],
+      "referenceAnswer": "Following up on yesterday’s case — Colten is the Prime contact. Tell us if time or tray moved."
     },
     {
       "id": "formatting-brevity-1",
@@ -215,15 +353,51 @@
         "formatting",
         "brevity"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "Two sentences, internal Slack to Prime: Joey is working the Belli tray at Advent Tampa. Do not invent a start date or a dollar.",
+      "allowedContext": "KEEP Joey + Belli + Advent Tampa.\nTwo sentences. One screen. Sendable.\nNo start date, patient count, or $.\nNo chatbot wrapper.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "Here's a",
+        "In conclusion",
+        "delve"
+      ],
+      "bits": [
+        {
+          "id": "keep-joey",
+          "kind": "must-include",
+          "pattern": "Joey"
+        },
+        {
+          "id": "keep-belli",
+          "kind": "must-include",
+          "pattern": "Belli"
+        },
+        {
+          "id": "keep-advent",
+          "kind": "must-include",
+          "pattern": "Advent"
+        },
+        {
+          "id": "no-wrapper",
+          "kind": "must-exclude",
+          "pattern": "/here(?:'s| is) (?:a |the )?(?:draft|rewrite|revised)|in conclusion|delve|as an AI/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        },
+        {
+          "id": "no-started",
+          "kind": "must-exclude",
+          "pattern": "/\\b(they|we|trial) started\\b|started the (Belli|trial)/i"
+        }
+      ],
       "failureTags": [
         "verbose",
         "format-miss"
-      ]
+      ],
+      "referenceAnswer": "Joey is working the Belli tray at Advent Tampa. We do not have a start date."
     },
     {
       "id": "tool-rag-boundary-1",
@@ -232,15 +406,47 @@
         "tool-rag-boundary",
         "missing-facts"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "How many Venapax cases did Oak Hill do last quarter? Venapax is our line. There were no sales. Do not claim we lack access.",
+      "allowedContext": "Venapax is ours. We have access.\nOak Hill last quarter: no Venapax sales / no cases.\nDo not invent a count.\nDo not say we lack access, have no access, or cannot see our own line.\nKEEP Oak Hill + Venapax.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "lack access",
+        "no access",
+        "don't have access",
+        "cannot access"
+      ],
+      "bits": [
+        {
+          "id": "keep-venapax",
+          "kind": "must-include",
+          "pattern": "Venapax"
+        },
+        {
+          "id": "keep-oak-hill",
+          "kind": "must-include",
+          "pattern": "Oak Hill"
+        },
+        {
+          "id": "no-lack-access",
+          "kind": "must-exclude",
+          "pattern": "/lack access|don'?t have access|do not have access|no access|cannot access|can't access/i"
+        },
+        {
+          "id": "omit-or-zero",
+          "kind": "must-omit-unknown",
+          "pattern": "/no (venapax )?sales|no (venapax )?cases|zero|none|don'?t have a (count|number)|do not have a (count|number)/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        }
+      ],
       "failureTags": [
         "hallucinated-tool",
         "missing-facts"
-      ]
+      ],
+      "referenceAnswer": "We had no Venapax cases at Oak Hill last quarter. That is our line — we are not missing access."
     },
     {
       "id": "polarity-vidonic-1",
@@ -248,14 +454,55 @@
       "tags": [
         "polarity"
       ],
-      "prompt": "",
-      "allowedContext": "",
+      "prompt": "Rewrite for ZB outbound: “I got Colten in front of Mario Saturday and I think I flipped Oak Hill off Vidonic.” Keep Colten. Do not declare Oak Hill flipped or converted. Off is not to.",
+      "allowedContext": "KEEP Colten + Mario + Saturday + Oak Hill.\nColten was in front of Mario Saturday. That is a meeting, not a conversion.\nDo not declare Oak Hill flipped, converted, or won.\nOff Vidonic is not to Vidonic.\nNo first-case claim. No $.",
       "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
+      "forbiddenClaims": [
+        "to Vidonic",
+        "I flipped",
+        "I got Colten"
+      ],
+      "bits": [
+        {
+          "id": "keep-colten",
+          "kind": "must-include",
+          "pattern": "Colten"
+        },
+        {
+          "id": "keep-mario",
+          "kind": "must-include",
+          "pattern": "Mario"
+        },
+        {
+          "id": "keep-oak-hill",
+          "kind": "must-include",
+          "pattern": "Oak Hill"
+        },
+        {
+          "id": "no-to-vidonic",
+          "kind": "must-exclude",
+          "pattern": "/\\bto Vidonic\\b/i"
+        },
+        {
+          "id": "no-declared-flip",
+          "kind": "must-exclude",
+          "pattern": "/\\b(we |I )?(flipped|converted|won)\\b.{0,40}Oak Hill|Oak Hill.{0,40}\\b(flipped|converted|won)\\b/i"
+        },
+        {
+          "id": "no-hero-i",
+          "kind": "must-exclude",
+          "pattern": "/\\bI(?:['’](?:m|ve|d|ll))?\\b|\\b(?:my|mine|myself|personally)\\b/i"
+        },
+        {
+          "id": "no-dollar",
+          "kind": "must-exclude",
+          "pattern": "/\\$\\s?\\d/"
+        }
+      ],
       "failureTags": [
         "polarity-trap"
-      ]
+      ],
+      "referenceAnswer": "Colten sat with Mario Saturday at Oak Hill. Nothing is flipped. Off Vidonic is not a conversion."
     },
     {
       "id": "easy-greeting-1",

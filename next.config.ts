@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   // and the canvas never hydrates (empty grid, chrome still SSR'd).
   allowedDevOrigins: [
     "100.111.89.59",
+    "172.29.1.215",
     "127.0.0.1",
     "*.ts.net",
     "*.trycloudflare.com",

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CopyButton } from "@/components/run/copy-button";
 import { EvalCardFlow } from "@/components/eval/eval-card-flow";
-import { activeItemId, focusExperiment } from "@/lib/eval/focus";
+import { activeItemId, experimentItemIds, focusExperiment } from "@/lib/eval/focus";
 import {
   experimentToCausalJsonl,
   experimentToCsv,
@@ -23,6 +23,7 @@ import { useGraphStore } from "@/store/graph-store";
 
 type Catalog = {
   sets: Array<EvalSet & { runnable: number; total: number }>;
+  diskCards?: string[];
   architectures: Array<{
     id: EvalArchitectureId;
     name: string;
@@ -31,6 +32,25 @@ type Catalog = {
 };
 
 type Progress = { total: number; done: number; errors: number; pending: number };
+
+const LIVE_EXPERIMENT_KEY = "prism.eval.liveExperimentId";
+
+function readLiveExperimentId() {
+  try {
+    return sessionStorage.getItem(LIVE_EXPERIMENT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeLiveExperimentId(id: string | null) {
+  try {
+    if (id) sessionStorage.setItem(LIVE_EXPERIMENT_KEY, id);
+    else sessionStorage.removeItem(LIVE_EXPERIMENT_KEY);
+  } catch {
+    // private mode
+  }
+}
 
 function downloadText(filename: string, text: string, mime: string) {
   const blob = new Blob([text], { type: mime });
@@ -58,12 +78,15 @@ export function EvalView() {
   const [reps, setReps] = useState(1);
   const [temperature, setTemperature] = useState("0.4");
   const [busy, setBusy] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
   const [importNote, setImportNote] = useState<string | null>(null);
+  const [pendingItemIds, setPendingItemIds] = useState<string[]>([]);
+  const [peekItemId, setPeekItemId] = useState<string | null>(null);
+  const [dropActive, setDropActive] = useState(false);
   const pauseRef = useRef(false);
-  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,10 +96,18 @@ export function EvalView() {
         const catalogData = (await catalogRes.json()) as Catalog;
         if (!cancelled) setCatalog(catalogData);
         const listRes = await fetch("/api/eval/experiments");
-        const listData = (await listRes.json()) as { experiments?: Array<{ id: string }> };
-        const id = listData.experiments?.[0]?.id;
+        const listData = (await listRes.json()) as {
+          experiments?: Array<{ id: string; status: string }>;
+        };
+        const live = listData.experiments?.find((row) => row.status === "running");
+        const sessionId = readLiveExperimentId();
+        const id = live?.id ?? sessionId ?? undefined;
         if (!id || cancelled) return;
         const res = await fetch(`/api/eval/experiments/${id}`);
+        if (!res.ok) {
+          if (!live) writeLiveExperimentId(null);
+          return;
+        }
         const body = (await res.json()) as {
           experiment?: ExperimentRecord;
           progress?: Progress;
@@ -96,7 +127,14 @@ export function EvalView() {
   }, []);
 
   const selectedSet = catalog?.sets.find((s) => s.id === evalSetId);
-  const itemId = experiment ? activeItemId(experiment) : undefined;
+  const liveItemId = experiment ? activeItemId(experiment) : undefined;
+  const queuedIds = experiment ? experimentItemIds(experiment) : [];
+  const itemId =
+    peekItemId && queuedIds.includes(peekItemId) ? peekItemId : liveItemId;
+
+  useEffect(() => {
+    if (experiment?.status === "running") setPeekItemId(null);
+  }, [experiment?.status, liveItemId]);
   const focused = useMemo(() => {
     if (!experiment || !itemId) return null;
     return focusExperiment(experiment, itemId);
@@ -107,6 +145,63 @@ export function EvalView() {
     const catalogRes = await fetch("/api/eval/sets");
     const catalogData = (await catalogRes.json()) as Catalog;
     setCatalog(catalogData);
+  };
+
+  const rememberItem = (id: string) => {
+    setPendingItemIds((curr) => (curr.includes(id) ? curr : [...curr, id]));
+  };
+
+  const clearQueue = () => {
+    setPendingItemIds([]);
+    setImportNote(null);
+    setError(null);
+  };
+
+  const toggleDiskCard = (id: string) => {
+    if (pendingItemIds.includes(id)) {
+      setPendingItemIds((curr) => curr.filter((row) => row !== id));
+      setImportNote(null);
+      return;
+    }
+    void importFromDisk(id);
+  };
+
+  const postItem = async (parsed: unknown) => {
+    const res = await fetch("/api/eval/sets/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed),
+    });
+    const data = (await res.json()) as {
+      error?: string;
+      runnable?: number;
+      total?: number;
+      item?: { id: string };
+    };
+    if (!res.ok) throw new Error(data.error || "Import failed");
+    if (data.item?.id) rememberItem(data.item.id);
+    return data;
+  };
+
+  const importFromDisk = async (diskId: string) => {
+    if (!diskId || busy) return;
+    setBusy(true);
+    setError(null);
+    setImportNote(null);
+    try {
+      const data = await postItem({ diskId });
+      await refreshCatalog();
+      setImportNote(`Queued ${data.item?.id ?? diskId}. Create experiment to run it.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const takeFiles = (files: FileList | File[] | null) => {
+    if (!files?.length || busy) return;
+    void importFiles(files);
   };
 
   const importSigned = async () => {
@@ -122,22 +217,41 @@ export function EvalView() {
       } catch {
         throw new Error("Paste a signed EvalItem JSON object.");
       }
-      const res = await fetch("/api/eval/sets/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        runnable?: number;
-        total?: number;
-        item?: { id: string };
-      };
-      if (!res.ok) throw new Error(data.error || "Import failed");
+      const data = await postItem(parsed);
       await refreshCatalog();
       setImportText("");
+      setImportNote(`Imported ${data.item?.id ?? "item"}. Create experiment to run it.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importFiles = async (files: FileList | File[]) => {
+    const list = Array.from(files);
+    if (!list.length || busy) return;
+    setBusy(true);
+    setError(null);
+    setImportNote(null);
+    const ids: string[] = [];
+    try {
+      for (const file of list) {
+        const raw = (await file.text()).trim();
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw) as unknown;
+        } catch {
+          throw new Error(`${file.name} is not JSON.`);
+        }
+        const data = await postItem(parsed);
+        if (data.item?.id) ids.push(data.item.id);
+      }
+      await refreshCatalog();
       setImportNote(
-        `Imported ${data.item?.id ?? "item"} · ${data.runnable}/${data.total} runnable`,
+        ids.length === 1
+          ? `Imported ${ids[0]}. Create experiment to run it.`
+          : `Imported ${ids.length} cards. Create experiment to run them in order.`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -147,7 +261,12 @@ export function EvalView() {
   };
 
   const create = async () => {
+    if (!pendingItemIds.length) {
+      setError("Import a signed JSON first — this run is only the cards you upload.");
+      return;
+    }
     setBusy(true);
+    setCreating(true);
     setError(null);
     try {
       const res = await fetch("/api/eval/experiments", {
@@ -160,6 +279,7 @@ export function EvalView() {
           profile: {
             temperature: Number(temperature) || undefined,
           },
+          itemIds: pendingItemIds,
         }),
       });
       const data = (await res.json()) as {
@@ -168,12 +288,16 @@ export function EvalView() {
         error?: string;
       };
       if (!res.ok || !data.experiment) throw new Error(data.error || "Create failed");
+      writeLiveExperimentId(data.experiment.id);
+      setPendingItemIds([]);
+      setPeekItemId(null);
       setExperiment(data.experiment);
       setProgress(data.progress ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
+      setCreating(false);
     }
   };
 
@@ -219,6 +343,19 @@ export function EvalView() {
     );
   };
 
+  const newQueue = () => {
+    pauseRef.current = true;
+    writeLiveExperimentId(null);
+    setExperiment(null);
+    setProgress(null);
+    setPendingItemIds([]);
+    setPeekItemId(null);
+    setError(null);
+    setImportNote(null);
+  };
+
+  const followingLive = experiment?.status === "running" || running;
+
   const progressLine = progress ? (
     <p className="sheet-help">
       {itemId ? `${itemId} · ` : ""}
@@ -232,16 +369,25 @@ export function EvalView() {
     <div className="page-workspace eval-workspace">
       <header className="page-workspace-header">
         <div>
-          <p className="sheet-kicker">Eval Lab</p>
-          <h1>One leftover through three architectures</h1>
+          <p className="sheet-kicker">Eval mode</p>
+          <h1>One question through three architectures</h1>
           <p className="sheet-help">
-            The floor shows the card that is running. Earlier leftovers stay in
-            History. The queue still walks the whole signed set in the background.
+            Import signed JSON, create the experiment, then run. This page
+            stays empty until you start a queue — finished cards live in
+            History, and you can copy each card’s output and exhaust from
+            there.
           </p>
         </div>
-        <Link href="/eval/history" className="btn">
-          History
-        </Link>
+        <div className="eval-header-actions">
+          {experiment ? (
+            <button type="button" className="btn" onClick={newQueue} disabled={running}>
+              New queue
+            </button>
+          ) : null}
+          <Link href="/eval/history" className="btn">
+            History
+          </Link>
+        </div>
       </header>
 
       {running ? (
@@ -274,7 +420,7 @@ export function EvalView() {
               >
                 {(catalog?.sets ?? []).map((set) => (
                   <option key={set.id} value={set.id}>
-                    {set.name} ({set.runnable}/{set.total} runnable)
+                    Eval set · {set.runnable}/{set.total} ready
                   </option>
                 ))}
               </select>
@@ -315,53 +461,100 @@ export function EvalView() {
           </fieldset>
           {selectedSet ? (
             <p className="sheet-help">
-              Phase 1 scores only items with prompt + allowedContext.{" "}
-              {selectedSet.runnable} runnable of {selectedSet.total}. The lab
-              floor still shows one card at a time.
+              Only cards you add below go into this run, in that order.
+              {pendingItemIds.length
+                ? ` ${pendingItemIds.length} queued.`
+                : " Nothing queued yet."}{" "}
+              One card on the floor at a time.
             </p>
           ) : null}
-          <div className="eval-import">
-            <label>
-              Import signed item
+          <div
+            className={`eval-import${dropActive ? " is-drop" : ""}`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDropActive(true);
+            }}
+            onDragLeave={() => setDropActive(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDropActive(false);
+              takeFiles(e.dataTransfer.files);
+            }}
+          >
+            {(catalog?.diskCards ?? []).length ? (
+              <div className="eval-disk-cards">
+                <p className="eval-import-kicker">
+                  Signed Cards: Already on the machine. Click one or more to add
+                  them to the experiment.
+                </p>
+                <div className="eval-card-picks">
+                  {(catalog?.diskCards ?? []).map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      className={pendingItemIds.includes(id) ? "btn btn-accent" : "btn"}
+                      disabled={busy}
+                      onClick={() => toggleDiskCard(id)}
+                    >
+                      {id}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="eval-upload">
+              <p className="eval-import-kicker">Upload or paste JSON</p>
               <textarea
                 className="eval-import-input"
-                rows={6}
+                rows={4}
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
-                placeholder="Paste one signed EvalItem JSON (id must already exist in the set)."
+                placeholder="Drop .json files here, or paste a signed EvalItem."
                 disabled={busy}
               />
-            </label>
-            <div className="eval-import-actions">
-              <input
-                ref={importFileRef}
-                type="file"
-                accept="application/json,.json"
-                hidden
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!file) return;
-                  setImportText(await file.text());
-                }}
-              />
-              <button
-                type="button"
-                className="btn"
-                disabled={busy}
-                onClick={() => importFileRef.current?.click()}
-              >
-                Choose file
-              </button>
-              <button
-                type="button"
-                className="btn btn-accent"
-                disabled={busy || !importText.trim()}
-                onClick={() => void importSigned()}
-              >
-                Import signed item
-              </button>
+              <div className="eval-import-actions">
+                <label className="btn eval-file-btn">
+                  Choose JSON files
+                  <input
+                    type="file"
+                    className="eval-file-native"
+                    accept=".json,application/json,text/plain"
+                    multiple
+                    disabled={busy}
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      e.target.value = "";
+                      takeFiles(files);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy || !importText.trim()}
+                  onClick={() => void importSigned()}
+                >
+                  Import pasted JSON
+                </button>
+              </div>
             </div>
+            {pendingItemIds.length ? (
+              <div className="eval-queue-row">
+                <ol className="eval-pending">
+                  {pendingItemIds.map((id) => (
+                    <li key={id}>{id}</li>
+                  ))}
+                </ol>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={clearQueue}
+                >
+                  Clear queue
+                </button>
+              </div>
+            ) : null}
             {importNote ? <p className="sheet-help">{importNote}</p> : null}
           </div>
           <div className="eval-actions">
@@ -369,9 +562,9 @@ export function EvalView() {
               type="button"
               className="btn btn-accent"
               onClick={() => void create()}
-              disabled={busy}
+              disabled={busy || !pendingItemIds.length}
             >
-              {busy ? "Creating…" : "Create experiment"}
+              {creating ? "Creating…" : "Create experiment"}
             </button>
             <button
               type="button"
@@ -389,6 +582,21 @@ export function EvalView() {
 
       {focused ? (
         <>
+          {queuedIds.length > 1 ? (
+            <nav className="eval-card-picks" aria-label="Cards in this run">
+              {queuedIds.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={id === itemId ? "btn btn-accent" : "btn"}
+                  disabled={followingLive}
+                  onClick={() => setPeekItemId(id)}
+                >
+                  {id}
+                </button>
+              ))}
+            </nav>
+          ) : null}
           <EvalCardFlow
             focused={focused}
             item={currentItem}
@@ -465,7 +673,7 @@ export function EvalView() {
               </button>
             </div>
             <p className="sheet-help">
-              This download is the leftover on the floor, not the whole queue.
+              This download is the card on this page, not the whole queue.
             </p>
           </section>
         </>

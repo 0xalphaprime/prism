@@ -62,7 +62,7 @@ Around the graph:
 | **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
 | **New architecture** (`/build`) | Builder agent — type an archetype; the lab emits a graph |
 | **Trace** (`/trace`) | Product report — Scan / Engineer, spine jump, who each hop saw, Judge chips, Copy all + export menu |
-| **Eval** (`/eval`) | One leftover through three isolated graphs; History archives past cards |
+| **Eval** (`/eval`) | One question through three isolated graphs; History archives past cards |
 | **Talk** | Natural-language edits that land on the same graph |
 
 **Topology note.** Channels default into **Context Hub**, then Split → agents → Judge. You may also drag a channel (or Hub) **directly into a downstream node** for intentional late context inject. See [`VARIETY.md`](VARIETY.md) for the toolkit roadmap.
@@ -249,7 +249,7 @@ Recommended first path:
 
 Use this when you want inspectable exhaust for the local student — not a LoRA run.
 
-1. Click **Student vs teachers** on the architecture bar (or **More → Template…**). If the canvas is empty, that button restores the graph.
+1. Open **More → Template…** and pick **Student vs teachers**. If the canvas is empty, Prism restores that graph on first load.
 2. Connections: OpenRouter as default channel for *new teacher tiles*. Do **not** click **Apply to this graph** if you only meant to remap teachers — Ollama/Nemo is pinned and will stay, but you still don’t need a full remap.
 3. Put one sharp leftover in Hub notes (or keep the seeded missing-fact brief). Architecture **Prompt** is the run intent.
 4. **Step** (or **Run all**) — you land on **Trace**. Spine plus cells: Hub → specialists → Judge → **Nemo after Judge**. First pass: Step, not Run all. Teacher/Critic **must not** list Nemo in **saw** — isolation fail skips the student causal row. Second-pass Nemo **should** list Hub, first Nemo, teachers, and Judge — that hop is the “can it answer better with the pack?” check.
@@ -280,7 +280,7 @@ Skills, GitHub, and Knowledge Cards (Notion) stay under **More channels**.
 
 ### Eval Lab
 
-Use **Eval** when the question is “did feedback fix this leftover, and what should we change?” Foundry stays the student. Prism does not train.
+Use **Eval** when the question is “did feedback fix this card, and what should we change?” Foundry stays the student. Prism does not train.
 
 **Three isolated experiment graphs** (also under More → Template). Do not reuse interactive Student vs teachers for the matrix — that pathway still packs Teacher/Critic essays into second Nemo.
 
@@ -309,9 +309,9 @@ Do not reuse Student vs teachers / Starter MoA for the matrix
 
 The three isolated graphs are `eval-baseline`, `eval-teacher-refine`, `eval-teacher-critic`. First host run (when Alex says go): signed items × those three × 1 × 0.4.
 
-The **Eval** floor shows **one leftover at a time** (the card currently running, then the next idle card). Create experiment still queues every runnable item on disk; History (`/eval/history`) is the archive for finished cards. Do not read leftover tags from other rows as the name of this run.
+The **Eval** page is empty until you import signed JSON and create a queue. **Create experiment** runs only those cards, in order. History (`/eval/history`) is the archive — open each card to copy hops and exhaust. Do not read tags from other rows as the name of this run.
 
-Queue: pick set, architectures, reps, temperature → **Create experiment** → **Run experiment**. One Foundry/Ollama student job at a time. Headless — the canvas is not swapped. Queue collapses to progress + Pause while a cell is running.
+Queue: import one or more signed JSON files → **Create experiment** → **Run experiment**. One Foundry/Ollama student job at a time. Headless — the canvas is not swapped. Queue collapses to progress + Pause while a cell is running.
 
 Report on the floor: this card’s prompt through the three graphs, failure clusters, before/after. Downloads from the floor are this card, not the whole queue. Full experiments stay under History.
 

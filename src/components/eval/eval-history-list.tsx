@@ -38,15 +38,15 @@ export function EvalHistoryList() {
     <div className="page-workspace eval-workspace">
       <header className="page-workspace-header">
         <div>
-          <p className="sheet-kicker">Eval Lab</p>
+          <p className="sheet-kicker">Eval mode</p>
           <h1>History</h1>
           <p className="sheet-help">
-            Past leftovers and finished experiments. The live floor stays on
+            Open a card to copy its hops and exhaust. The live queue stays on
             Eval.
           </p>
         </div>
         <Link href="/eval" className="btn btn-accent">
-          Back to Eval
+          Back to Eval mode
         </Link>
       </header>
 
@@ -55,7 +55,13 @@ export function EvalHistoryList() {
       {rows.length ? (
         rows.map((row) => (
           <section key={row.id} className="eval-card">
-            <h2>{row.name}</h2>
+            <h2>
+              {(row.itemIds ?? []).length === 0
+                ? "Eval run"
+                : row.itemIds.length <= 3
+                  ? row.itemIds.join(" · ")
+                  : `${row.itemIds.slice(0, 2).join(" · ")} · +${row.itemIds.length - 2}`}
+            </h2>
             <p className="sheet-help">
               {row.status} · {new Date(row.updatedAt).toLocaleString()}
               {row.progress

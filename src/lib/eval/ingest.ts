@@ -84,7 +84,7 @@ export function upsertEvalItem(item: EvalItem): EvalSet {
   const idx = set.items.findIndex((row) => row.id === item.id);
   if (idx < 0) {
     throw new Error(
-      `Unknown leftover id “${item.id}”. Import only replaces an existing shell.`,
+      `Unknown eval item id “${item.id}”. Import only replaces an existing shell.`,
     );
   }
   const next: EvalSet = {

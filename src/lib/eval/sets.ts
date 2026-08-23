@@ -50,3 +50,26 @@ export function evalSetHash(set: EvalSet): string {
 export function runnableItems(set: EvalSet): EvalItem[] {
   return set.items.filter((item) => item.prompt.trim() && item.allowedContext.trim());
 }
+
+/** Experiment queue is the ids you imported, in that order — not every runnable shell. */
+export function pickRunnableItems(set: EvalSet, itemIds: string[]): EvalItem[] {
+  const unique: string[] = [];
+  for (const id of itemIds) {
+    const trimmed = id.trim();
+    if (!trimmed || unique.includes(trimmed)) continue;
+    unique.push(trimmed);
+  }
+  if (!unique.length) {
+    throw new Error("Import at least one signed item before creating an experiment");
+  }
+  const runnable = runnableItems(set);
+  return unique.map((id) => {
+    const item = runnable.find((row) => row.id === id);
+    if (!item) {
+      throw new Error(
+        `“${id}” is not runnable yet. Import a signed JSON with prompt and allowedContext.`,
+      );
+    }
+    return item;
+  });
+}

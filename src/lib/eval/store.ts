@@ -3,7 +3,7 @@ import path from "node:path";
 import { hashJson } from "@/lib/hash";
 import { newId } from "@/lib/id";
 import { architectureFingerprint } from "./graphs";
-import { evalSetHash, itemContextHash, runnableItems } from "./sets";
+import { evalSetHash, itemContextHash, pickRunnableItems } from "./sets";
 import { getEvalSetLive } from "./sets-disk";
 import type {
   EvalArchitectureId,
@@ -64,13 +64,11 @@ export function createExperimentRecord(args: {
   reps?: number;
   profile?: ExperimentProfile;
   name?: string;
+  itemIds?: string[];
 }): ExperimentRecord {
   const set = getEvalSetLive(args.evalSetId);
   if (!set) throw new Error(`Unknown eval set: ${args.evalSetId}`);
-  const items = runnableItems(set);
-  if (!items.length) {
-    throw new Error("Eval set has no runnable items (need prompt + allowedContext)");
-  }
+  const items = pickRunnableItems(set, args.itemIds ?? []);
   const architectureIds = args.architectureIds;
   if (!architectureIds.length) throw new Error("Pick at least one architecture");
   const reps = Math.max(1, Math.min(args.reps ?? 1, 8));
@@ -110,7 +108,11 @@ export function createExperimentRecord(args: {
     kind: EXPERIMENT_FILE_KIND,
     schemaVersion: 1,
     id,
-    name: args.name?.trim() || `${set.name} · ${new Date(now).toISOString().slice(0, 16)}`,
+    name:
+      args.name?.trim() ||
+      (items.length === 1
+        ? `${items[0].id} · ${new Date(now).toISOString().slice(0, 16)}`
+        : `${items.length} cards · ${new Date(now).toISOString().slice(0, 16)}`),
     evalSetId: set.id,
     architectureIds,
     reps,
