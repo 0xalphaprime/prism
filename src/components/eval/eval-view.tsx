@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CopyButton } from "@/components/run/copy-button";
+import { EvalCardFlow } from "@/components/eval/eval-card-flow";
+import { activeItemId, focusExperiment } from "@/lib/eval/focus";
 import {
   experimentToCausalJsonl,
   experimentToCsv,
@@ -10,16 +13,9 @@ import {
   experimentToTrainJsonl,
 } from "@/lib/eval/report";
 import {
-  beforeAfterPairs,
-  failureClusters,
-  questionMatrix,
-  summarizeArchitectures,
-  winnerLine,
-} from "@/lib/eval/stats";
-import { buildDecisionNotes } from "@/lib/eval/decision";
-import {
   EVAL_ARCHITECTURE_IDS,
   type EvalArchitectureId,
+  type EvalItem,
   type EvalSet,
   type ExperimentRecord,
 } from "@/lib/eval/types";
@@ -46,12 +42,13 @@ function downloadText(filename: string, text: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-function fmt(score: number | null | undefined) {
-  if (score == null) return "—";
-  return score.toFixed(2);
+function findItem(catalog: Catalog | null, evalSetId: string, itemId?: string): EvalItem | undefined {
+  if (!itemId) return undefined;
+  return catalog?.sets.find((s) => s.id === evalSetId)?.items.find((row) => row.id === itemId);
 }
 
 export function EvalView() {
+  const router = useRouter();
   const createFromTemplate = useGraphStore((s) => s.createFromTemplate);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [experiment, setExperiment] = useState<ExperimentRecord | null>(null);
@@ -65,7 +62,6 @@ export function EvalView() {
   const [error, setError] = useState<string | null>(null);
   const [importText, setImportText] = useState("");
   const [importNote, setImportNote] = useState<string | null>(null);
-  const [openPair, setOpenPair] = useState<string | null>(null);
   const pauseRef = useRef(false);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -100,6 +96,12 @@ export function EvalView() {
   }, []);
 
   const selectedSet = catalog?.sets.find((s) => s.id === evalSetId);
+  const itemId = experiment ? activeItemId(experiment) : undefined;
+  const focused = useMemo(() => {
+    if (!experiment || !itemId) return null;
+    return focusExperiment(experiment, itemId);
+  }, [experiment, itemId]);
+  const currentItem = findItem(catalog, experiment?.evalSetId ?? evalSetId, itemId);
 
   const refreshCatalog = async () => {
     const catalogRes = await fetch("/api/eval/sets");
@@ -206,29 +208,9 @@ export function EvalView() {
     }
   };
 
-  const summaries = useMemo(
-    () => (experiment ? summarizeArchitectures(experiment) : []),
-    [experiment],
-  );
-  const matrix = useMemo(
-    () => (experiment ? questionMatrix(experiment) : []),
-    [experiment],
-  );
-  const clusters = useMemo(
-    () => (experiment ? failureClusters(experiment) : []),
-    [experiment],
-  );
-  const pairs = useMemo(
-    () => (experiment ? beforeAfterPairs(experiment) : []),
-    [experiment],
-  );
-  const decisions = useMemo(
-    () => (experiment ? buildDecisionNotes(experiment) : []),
-    [experiment],
-  );
-  const report = experiment ? experimentToMarkdown(experiment) : "";
-  const slug = experiment
-    ? experiment.name.replace(/\s+/g, "-").toLowerCase()
+  const report = focused ? experimentToMarkdown(focused) : "";
+  const slug = focused
+    ? `${focused.name.replace(/\s+/g, "-").toLowerCase()}-${itemId ?? "card"}`
     : "experiment";
 
   const toggleArch = (id: EvalArchitectureId) => {
@@ -237,279 +219,187 @@ export function EvalView() {
     );
   };
 
+  const progressLine = progress ? (
+    <p className="sheet-help">
+      {itemId ? `${itemId} · ` : ""}
+      {progress.done}/{progress.total} cells
+      {progress.errors ? ` · ${progress.errors} error` : ""}
+      {experiment ? ` · ${experiment.status}` : ""}
+    </p>
+  ) : null;
+
   return (
     <div className="page-workspace eval-workspace">
       <header className="page-workspace-header">
         <div>
           <p className="sheet-kicker">Eval Lab</p>
-          <h1>Frozen questions × isolated architectures</h1>
+          <h1>One leftover through three architectures</h1>
           <p className="sheet-help">
-            Foundry is the local student. Prism queues the same leftover across
-            baseline, teacher refine, and teacher + critic — then scores first
-            vs revised. Trace stays the single-run report.
+            The floor shows the card that is running. Earlier leftovers stay in
+            History. The queue still walks the whole signed set in the background.
           </p>
         </div>
+        <Link href="/eval/history" className="btn">
+          History
+        </Link>
       </header>
 
-      <section className="eval-card">
-        <h2>Queue</h2>
-        <div className="eval-form">
-          <label>
-            Eval set
-            <select
-              className="architecture-select"
-              value={evalSetId}
-              onChange={(e) => setEvalSetId(e.target.value)}
-            >
-              {(catalog?.sets ?? []).map((set) => (
-                <option key={set.id} value={set.id}>
-                  {set.name} ({set.runnable}/{set.total} runnable)
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Reps
-            <input
-              type="number"
-              min={1}
-              max={8}
-              value={reps}
-              onChange={(e) => setReps(Number(e.target.value) || 1)}
-            />
-          </label>
-          <label>
-            Student temperature
-            <input
-              value={temperature}
-              onChange={(e) => setTemperature(e.target.value)}
-            />
-          </label>
-        </div>
-        <fieldset className="eval-arch-picks">
-          <legend>Architectures</legend>
-          {(catalog?.architectures ?? []).map((arch) => (
-            <label key={arch.id} className="eval-check">
-              <input
-                type="checkbox"
-                checked={archs.includes(arch.id)}
-                onChange={() => toggleArch(arch.id)}
-              />
-              <span>
-                <strong>{arch.name}</strong>
-                <em>{arch.description}</em>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-        {selectedSet ? (
-          <p className="sheet-help">
-            Phase 1 scores only items with prompt + allowedContext.{" "}
-            {selectedSet.runnable} runnable of {selectedSet.total}. Scaffolds
-            stay in the set so the matrix shape is real.
-          </p>
-        ) : null}
-        <div className="eval-import">
-          <label>
-            Import signed item
-            <textarea
-              className="eval-import-input"
-              rows={6}
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-              placeholder='Paste one signed EvalItem JSON (id must already exist in the set).'
-              disabled={busy || running}
-            />
-          </label>
-          <div className="eval-import-actions">
-            <input
-              ref={importFileRef}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (!file) return;
-                setImportText(await file.text());
-              }}
-            />
+      {running ? (
+        <section className="eval-card">
+          <h2>Running</h2>
+          {progressLine}
+          <div className="eval-actions">
             <button
               type="button"
               className="btn"
-              disabled={busy || running}
-              onClick={() => importFileRef.current?.click()}
+              onClick={() => {
+                pauseRef.current = true;
+              }}
             >
-              Choose file
+              Pause after cell
+            </button>
+          </div>
+          {error ? <p className="eval-error">{error}</p> : null}
+        </section>
+      ) : (
+        <section className="eval-card">
+          <h2>Queue</h2>
+          <div className="eval-form">
+            <label>
+              Eval set
+              <select
+                className="architecture-select"
+                value={evalSetId}
+                onChange={(e) => setEvalSetId(e.target.value)}
+              >
+                {(catalog?.sets ?? []).map((set) => (
+                  <option key={set.id} value={set.id}>
+                    {set.name} ({set.runnable}/{set.total} runnable)
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Reps
+              <input
+                type="number"
+                min={1}
+                max={8}
+                value={reps}
+                onChange={(e) => setReps(Number(e.target.value) || 1)}
+              />
+            </label>
+            <label>
+              Student temperature
+              <input
+                value={temperature}
+                onChange={(e) => setTemperature(e.target.value)}
+              />
+            </label>
+          </div>
+          <fieldset className="eval-arch-picks">
+            <legend>Architectures</legend>
+            {(catalog?.architectures ?? []).map((arch) => (
+              <label key={arch.id} className="eval-check">
+                <input
+                  type="checkbox"
+                  checked={archs.includes(arch.id)}
+                  onChange={() => toggleArch(arch.id)}
+                />
+                <span>
+                  <strong>{arch.name}</strong>
+                  <em>{arch.description}</em>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+          {selectedSet ? (
+            <p className="sheet-help">
+              Phase 1 scores only items with prompt + allowedContext.{" "}
+              {selectedSet.runnable} runnable of {selectedSet.total}. The lab
+              floor still shows one card at a time.
+            </p>
+          ) : null}
+          <div className="eval-import">
+            <label>
+              Import signed item
+              <textarea
+                className="eval-import-input"
+                rows={6}
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder="Paste one signed EvalItem JSON (id must already exist in the set)."
+                disabled={busy}
+              />
+            </label>
+            <div className="eval-import-actions">
+              <input
+                ref={importFileRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  setImportText(await file.text());
+                }}
+              />
+              <button
+                type="button"
+                className="btn"
+                disabled={busy}
+                onClick={() => importFileRef.current?.click()}
+              >
+                Choose file
+              </button>
+              <button
+                type="button"
+                className="btn btn-accent"
+                disabled={busy || !importText.trim()}
+                onClick={() => void importSigned()}
+              >
+                Import signed item
+              </button>
+            </div>
+            {importNote ? <p className="sheet-help">{importNote}</p> : null}
+          </div>
+          <div className="eval-actions">
+            <button
+              type="button"
+              className="btn btn-accent"
+              onClick={() => void create()}
+              disabled={busy}
+            >
+              {busy ? "Creating…" : "Create experiment"}
             </button>
             <button
               type="button"
               className="btn btn-accent"
-              disabled={busy || running || !importText.trim()}
-              onClick={() => void importSigned()}
+              onClick={() => void runAll()}
+              disabled={!experiment || progress?.pending === 0}
             >
-              Import signed item
+              Run experiment
             </button>
           </div>
-          {importNote ? <p className="sheet-help">{importNote}</p> : null}
-        </div>
-        <div className="eval-actions">
-          <button type="button" className="btn btn-accent" onClick={() => void create()} disabled={busy || running}>
-            {busy ? "Creating…" : "Create experiment"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-accent"
-            onClick={() => void runAll()}
-            disabled={!experiment || running || progress?.pending === 0}
-          >
-            {running ? "Running…" : "Run experiment"}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => {
-              pauseRef.current = true;
-            }}
-            disabled={!running}
-          >
-            Pause after cell
-          </button>
-        </div>
-        {progress ? (
-          <p className="sheet-help">
-            {progress.done}/{progress.total} cells
-            {progress.errors ? ` · ${progress.errors} error` : ""}
-            {experiment ? ` · ${experiment.status}` : ""}
-          </p>
-        ) : null}
-        {error ? <p className="eval-error">{error}</p> : null}
-      </section>
+          {progressLine}
+          {error ? <p className="eval-error">{error}</p> : null}
+        </section>
+      )}
 
-      {experiment ? (
+      {focused ? (
         <>
+          <EvalCardFlow
+            focused={focused}
+            item={currentItem}
+            live
+            onOpenArchitecture={(id) => {
+              createFromTemplate(id);
+              router.push("/");
+            }}
+          />
           <section className="eval-card">
-            <h2>Executive</h2>
-            <p>{winnerLine(summaries)}</p>
-            <ul className="eval-decision">
-              {decisions.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-            <div className="eval-means">
-              {summaries.map((s) => (
-                <div key={s.architectureId} className="eval-mean">
-                  <strong>{s.name}</strong>
-                  <span>first {fmt(s.meanFirst)}</span>
-                  <span>revised {fmt(s.meanRevised)}</span>
-                  <span>lift {fmt(s.meanLift)}</span>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => createFromTemplate(s.architectureId)}
-                  >
-                    Open architecture
-                  </button>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="eval-card">
-            <h2>Question matrix</h2>
-            <div className="eval-table-wrap">
-              <table className="eval-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Split</th>
-                    {experiment.architectureIds.map((id) => (
-                      <th key={id}>{id.replace("eval-", "")}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {matrix.map((row) => (
-                    <tr key={row.itemId}>
-                      <td>
-                        {row.itemId}
-                        <div className="eval-tags">{row.tags.join(" · ")}</div>
-                      </td>
-                      <td>{row.split}</td>
-                      {experiment.architectureIds.map((id) => {
-                        const cell = row.byArch[id];
-                        return (
-                          <td key={id}>
-                            {fmt(cell.first)} / {fmt(cell.revised)} / {fmt(cell.lift)}
-                            <div className="eval-tags">{cell.status}</div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <section className="eval-card">
-            <h2>Failure clusters</h2>
-            {clusters.length ? (
-              <ul>
-                {clusters.map((cluster) => (
-                  <li key={cluster.tag}>
-                    <strong>{cluster.tag}</strong>{" "}
-                    {Object.entries(cluster.byArch)
-                      .map(([arch, n]) => `${arch} ${n}`)
-                      .join(" · ")}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="sheet-help">No failure tags yet.</p>
-            )}
-          </section>
-
-          <section className="eval-card">
-            <h2>Before / after</h2>
-            {pairs.length ? (
-              pairs.map((pair) => (
-                <article key={pair.cellId} className="eval-pair">
-                  <button
-                    type="button"
-                    className="eval-pair-toggle"
-                    onClick={() =>
-                      setOpenPair((curr) => (curr === pair.cellId ? null : pair.cellId))
-                    }
-                  >
-                    {pair.itemId} · {pair.architectureId} · lift {fmt(pair.lift)}
-                  </button>
-                  {openPair === pair.cellId ? (
-                    <div className="eval-pair-body">
-                      <div>
-                        <h3>First · {fmt(pair.firstScore)}</h3>
-                        <pre>{pair.first || "(empty)"}</pre>
-                      </div>
-                      <div>
-                        <h3>Revised · {fmt(pair.revisedScore)}</h3>
-                        <pre>{pair.revised || "(empty)"}</pre>
-                      </div>
-                      <Link href="/trace" className="btn">
-                        Open Trace
-                      </Link>
-                    </div>
-                  ) : null}
-                </article>
-              ))
-            ) : (
-              <p className="sheet-help">
-                Revised hops appear after teacher-refine or teacher+critic cells finish.
-              </p>
-            )}
-          </section>
-
-          <section className="eval-card">
-            <h2>Export</h2>
+            <h2>Export this card</h2>
             <div className="eval-actions">
               <CopyButton label="Copy report" text={report} />
               <button
@@ -527,7 +417,7 @@ export function EvalView() {
                 onClick={() =>
                   downloadText(
                     `${slug}.prism.scores.csv`,
-                    experimentToCsv(experiment),
+                    experimentToCsv(focused),
                     "text/csv",
                   )
                 }
@@ -540,12 +430,12 @@ export function EvalView() {
                 onClick={() =>
                   downloadText(
                     `${slug}.prism.experiment.json`,
-                    `${JSON.stringify(experiment, null, 2)}\n`,
+                    `${JSON.stringify(focused, null, 2)}\n`,
                     "application/json",
                   )
                 }
               >
-                Full JSON
+                JSON
               </button>
               <button
                 type="button"
@@ -553,7 +443,7 @@ export function EvalView() {
                 onClick={() =>
                   downloadText(
                     `${slug}.prism.causal.jsonl`,
-                    experimentToCausalJsonl(experiment) || "\n",
+                    experimentToCausalJsonl(focused) || "\n",
                     "application/jsonl",
                   )
                 }
@@ -566,7 +456,7 @@ export function EvalView() {
                 onClick={() =>
                   downloadText(
                     `${slug}.prism.train.jsonl`,
-                    experimentToTrainJsonl(experiment) || "\n",
+                    experimentToTrainJsonl(focused) || "\n",
                     "application/jsonl",
                   )
                 }
@@ -575,8 +465,7 @@ export function EvalView() {
               </button>
             </div>
             <p className="sheet-help">
-              Held-out never enters the train file. Second-pass Nemo stays out
-              of causal. First-pass Hub → Nemo is the SFT row when isolation holds.
+              This download is the leftover on the floor, not the whole queue.
             </p>
           </section>
         </>

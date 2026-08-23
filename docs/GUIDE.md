@@ -62,7 +62,7 @@ Around the graph:
 | **Connections** (`/connections`) | Provider / API / feed readiness; **default model channel** (e.g. OpenRouter) |
 | **New architecture** (`/build`) | Builder agent — type an archetype; the lab emits a graph |
 | **Trace** (`/trace`) | Product report — Scan / Engineer, spine jump, who each hop saw, Judge chips, Copy all + export menu |
-| **Eval** (`/eval`) | Frozen questions × isolated architectures × scored comparison |
+| **Eval** (`/eval`) | One leftover through three isolated graphs; History archives past cards |
 | **Talk** | Natural-language edits that land on the same graph |
 
 **Topology note.** Channels default into **Context Hub**, then Split → agents → Judge. You may also drag a channel (or Hub) **directly into a downstream node** for intentional late context inject. See [`VARIETY.md`](VARIETY.md) for the toolkit roadmap.
@@ -309,9 +309,11 @@ Do not reuse Student vs teachers / Starter MoA for the matrix
 
 The three isolated graphs are `eval-baseline`, `eval-teacher-refine`, `eval-teacher-critic`. First host run (when Alex says go): signed items × those three × 1 × 0.4.
 
-Queue: pick set, architectures, reps, temperature → **Create experiment** → **Run experiment**. One Foundry/Ollama student job at a time. Headless — the canvas is not swapped.
+The **Eval** floor shows **one leftover at a time** (the card currently running, then the next idle card). Create experiment still queues every runnable item on disk; History (`/eval/history`) is the archive for finished cards. Do not read leftover tags from other rows as the name of this run.
 
-Report views: executive winner + decision copy, question matrix, failure clusters, before/after. Downloads: human report, CSV, full JSON, causal JSONL, approved training JSONL (`split !== held-out`, isolation hold, first-pass Nemo only).
+Queue: pick set, architectures, reps, temperature → **Create experiment** → **Run experiment**. One Foundry/Ollama student job at a time. Headless — the canvas is not swapped. Queue collapses to progress + Pause while a cell is running.
+
+Report on the floor: this card’s prompt through the three graphs, failure clusters, before/after. Downloads from the floor are this card, not the whole queue. Full experiments stay under History.
 
 Decision copy (not automation):
 
