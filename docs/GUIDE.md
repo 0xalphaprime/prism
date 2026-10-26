@@ -254,10 +254,15 @@ Use this when you want inspectable exhaust for the local student — not a LoRA 
 | Env key | Default | Used by |
 |---------|---------|---------|
 | `PRIMARY_MODEL` | `muse-glimmer:30b` | Student + second-pass student, Nemo preset, eval graphs, Ollama channel default |
+| `PRIMARY_ALIAS` | `muse128` | Docs parity only — Prism doesn't read it |
+| `PRIMARY_QUANT` | `Q4_K_M` | Docs parity only — Prism doesn't read it |
+| `PRIMARY_CTX` | `131072` (128K) | Docs parity only — Prism doesn't read it |
 | `PRIOR_STUDENT_MODEL` | `nemotron-3.5-lightning:latest` | Explicit opt-in lanes only |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434/v1` | Where the Ollama refs are served |
 
-Values are a bare Ollama tag or a full `provider:model` ref. Both model keys are inlined at build time (`next.config.ts`), so restart `next dev` after changing them. Names follow the Foundry PRIMARY / PRIOR_STUDENT pins — rename here if Foundry's own env uses different keys.
+**One map, two repos.** The `PRIMARY_*` and `PRIOR_STUDENT_MODEL` keys are the same map Foundry uses — same names, same defaults — so one env block can be copied between Prism and Foundry. Foundry prefers these names and still accepts its older `FOUNDRY_PRIMARY_*` names as fallbacks. Prism reads only the shared names, so convert any `FOUNDRY_PRIMARY_*` lines before pasting them here. If the PRIMARY pin changes, change it in both repos.
+
+Model values are a bare Ollama tag or a full `provider:model` ref. `PRIMARY_MODEL` and `PRIOR_STUDENT_MODEL` are inlined at build time (`next.config.ts`), so restart `next dev` after changing them.
 
 Seeded lab card: `polarity-vidonic-1` (signed, in `prime-leftovers.v1`). `missing-fact-8` is **OUT** — frozen, never signed, and removed from the eval set. Don’t re-seed it or invent a replacement.
 
