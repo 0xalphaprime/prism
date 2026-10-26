@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { runStudentLab } from "@/lib/run-student-lab";
-import type { StudentLabSeed } from "@/lib/student-lab";
+import { STUDENT_LAB_SEED_ID, type StudentLabSeed } from "@/lib/student-lab";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -26,7 +26,8 @@ async function writeLastRun(seed: StudentLabSeed) {
 
 export async function GET() {
   const seed = await readLastRun();
-  if (!seed) {
+  // A last run from a retired seed (e.g. missing-fact-8) would re-inject its prompt.
+  if (!seed || seed.id !== STUDENT_LAB_SEED_ID) {
     return NextResponse.json({ error: "No lab run yet" }, { status: 404 });
   }
   return NextResponse.json(seed);

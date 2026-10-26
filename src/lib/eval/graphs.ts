@@ -72,7 +72,7 @@ export const EVAL_ARCHITECTURES: EvalArchitectureGraph[] = [
   {
     id: "eval-baseline",
     name: "Eval · Local baseline",
-    description: "Hub → Nemo. What Lightning does unaided.",
+    description: "Hub → Nemo. What the Foundry PRIMARY student (Muse) does unaided.",
     tags: ["eval", "baseline", "foundry"],
     nodes: [hubNode(), firstNemo()],
     edges: [edge("context", STUDENT_NODE_ID)],

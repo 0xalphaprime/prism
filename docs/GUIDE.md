@@ -249,13 +249,25 @@ Recommended first path:
 
 Use this when you want inspectable exhaust for the local student — not a LoRA run.
 
+**Student = Foundry PRIMARY (Muse), not Lightning-as-daily.** The “Nemo” tiles keep their historical name but run `PRIMARY_MODEL` — default `muse-glimmer:30b` (alias `muse128`, Q4_K_M, 128K). Every student / Ollama default resolves to PRIMARY unless a lane explicitly says otherwise. Lightning (`nemotron-3.5-lightning:latest`) is `PRIOR_STUDENT_MODEL`: it stays in the model picker, but only a lane that explicitly opts in uses it. Saved Student-vs-teachers graphs are re-pinned to PRIMARY on load.
+
+| Env key | Default | Used by |
+|---------|---------|---------|
+| `PRIMARY_MODEL` | `muse-glimmer:30b` | Student + second-pass student, Nemo preset, eval graphs, Ollama channel default |
+| `PRIOR_STUDENT_MODEL` | `nemotron-3.5-lightning:latest` | Explicit opt-in lanes only |
+| `OLLAMA_BASE_URL` | `http://127.0.0.1:11434/v1` | Where the Ollama refs are served |
+
+Values are a bare Ollama tag or a full `provider:model` ref. Both model keys are inlined at build time (`next.config.ts`), so restart `next dev` after changing them. Names follow the Foundry PRIMARY / PRIOR_STUDENT pins — rename here if Foundry's own env uses different keys.
+
+Seeded lab card: `polarity-vidonic-1` (signed, in `prime-leftovers.v1`). `missing-fact-8` is **OUT** — frozen, never signed, and removed from the eval set. Don’t re-seed it or invent a replacement.
+
 1. Open **More → Template…** and pick **Student vs teachers**. If the canvas is empty, Prism restores that graph on first load.
 2. Connections: OpenRouter as default channel for *new teacher tiles*. Do **not** click **Apply to this graph** if you only meant to remap teachers — Ollama/Nemo is pinned and will stay, but you still don’t need a full remap.
-3. Put one sharp leftover in Hub notes (or keep the seeded missing-fact brief). Architecture **Prompt** is the run intent.
+3. Put one sharp leftover in Hub notes (or keep the seeded `polarity-vidonic-1` brief). Architecture **Prompt** is the run intent.
 4. **Step** (or **Run all**) — you land on **Trace**. Spine plus cells: Hub → specialists → Judge → **Nemo after Judge**. First pass: Step, not Run all. Teacher/Critic **must not** list Nemo in **saw** — isolation fail skips the student causal row. Second-pass Nemo **should** list Hub, first Nemo, teachers, and Judge — that hop is the “can it answer better with the pack?” check.
 5. Distill target is Judge **keep / omit / never-say** chips (and the JSON trailer), not the essay → Foundry `SYSTEM.md`, then `run_eval.py --think`. Do **not** paste Judge prose into the *isolated* student prompt. Causal pack is Hub+intent → first Nemo when isolation holds. **Nemo after Judge** is `includeInSamples: false` — it may ingest the Judge card; it is not the SFT row.
 
-Nemo talks to Foundry via `OLLAMA_BASE_URL` (`http://100.78.81.94:11434/v1`). If Verify shows Ollama down, the student node errors loudly; teachers can still run.
+Nemo talks to Foundry via `OLLAMA_BASE_URL`. **Production pin: Foundry over Tailscale, `OLLAMA_BASE_URL=http://100.78.81.94:11434/v1`.** The code default stays `http://127.0.0.1:11434/v1` for local dev; set the env to hit Foundry. Foundry must have the PRIMARY tag pulled (`ollama list` shows `muse-glimmer:30b` / `muse128`). If Verify shows Ollama down, the student node errors loudly; teachers can still run.
 
 If the graph grid is empty over a Tailscale URL, Next blocked the client JS — hard-refresh after `allowedDevOrigins` includes that host (see README).
 
@@ -286,7 +298,7 @@ Use **Eval** when the question is “did feedback fix this card, and what should
 
 | ID | Graph | Second Nemo sees | Measures |
 |----|--------|------------------|----------|
-| `eval-baseline` | Hub → Nemo | none | What Lightning does unaided |
+| `eval-baseline` | Hub → Nemo | none | What the PRIMARY student (Muse) does unaided |
 | `eval-teacher-refine` | Hub → Nemo → Teacher (reads Nemo) → Nemo revise | Hub + first Nemo + Teacher feedback | Direct instruction |
 | `eval-teacher-critic` | Independent Teacher + Critic → Judge card → Nemo revise | Hub + first Nemo + **Judge card only** | Full feedback lift |
 

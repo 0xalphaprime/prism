@@ -2055,7 +2055,7 @@ export const useGraphStore = create<GraphState>((set, get) => {
         lastTalkMutation: {
           summary: seed.error
             ? `Lab run stopped: ${seed.error}`
-            : "Loaded missing-fact #8 — open Nemo, Teacher, and Judge outputs.",
+            : `Loaded ${seed.id} — open Nemo, Teacher, and Judge outputs.`,
           applied: !seed.error,
         },
       });
