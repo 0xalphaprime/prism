@@ -44,7 +44,7 @@ curl 'http://localhost:3001/api/providers?probe=1'
 
 In the app: **Connections → Verify providers** flips cards to Connected when a key works.
 
-A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) and the **Starter MoA** template. **Student vs teachers** also wants Ollama (`OLLAMA_BASE_URL`) for local Nemo; teachers still go through OpenRouter.
+A friend can start with **one** OpenRouter key (`OPEN_ROUTER_HERMES_API_KEY`) and the **Starter MoA** template. **Student vs teachers** also wants Ollama (`OLLAMA_BASE_URL`) for the local student, which runs Foundry PRIMARY (`PRIMARY_MODEL`, default `muse-glimmer:30b`); teachers still go through OpenRouter.
 
 ## Docs
 

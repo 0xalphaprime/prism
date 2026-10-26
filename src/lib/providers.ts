@@ -70,8 +70,63 @@ export const PROVIDERS: ProviderMeta[] = [
   },
 ];
 
-/** Curated weekend catalog — extend freely */
-export const MODEL_OPTIONS: ModelOption[] = [
+/** Foundry PRIMARY: muse-glimmer:30b (alias muse128, Q4_K_M, 128K). */
+export const PRIMARY_MODEL_FALLBACK = "muse-glimmer:30b";
+/** Prior student. Only lanes that explicitly opt in use this. */
+export const PRIOR_STUDENT_MODEL_FALLBACK = "nemotron-3.5-lightning:latest";
+
+/** Bare Ollama tags (`muse-glimmer:30b`) become `ollama:…`; full refs pass through. */
+function envModelRef(raw: string | undefined, fallback: string): ModelRef {
+  const value = raw?.trim() || fallback;
+  return (parseModelRef(value) ? value : `ollama:${value}`) as ModelRef;
+}
+
+/** Default student / Ollama model. Env: PRIMARY_MODEL. */
+export const PRIMARY_MODEL: ModelRef = envModelRef(
+  process.env.PRIMARY_MODEL,
+  PRIMARY_MODEL_FALLBACK,
+);
+
+/** Lightning. Env: PRIOR_STUDENT_MODEL. Never a silent default. */
+export const PRIOR_STUDENT_MODEL: ModelRef = envModelRef(
+  process.env.PRIOR_STUDENT_MODEL,
+  PRIOR_STUDENT_MODEL_FALLBACK,
+);
+
+const FOUNDRY_MODEL_OPTIONS: ModelOption[] = [
+  {
+    ref: `ollama:${PRIMARY_MODEL_FALLBACK}`,
+    label: "Muse Glimmer 30B (Foundry PRIMARY)",
+    provider: "ollama",
+    tier: "standard",
+  },
+  {
+    ref: "ollama:muse128",
+    label: "Muse 128K alias (Foundry PRIMARY)",
+    provider: "ollama",
+    tier: "standard",
+  },
+  {
+    ref: `ollama:${PRIOR_STUDENT_MODEL_FALLBACK}`,
+    label: "Nemo Lightning (prior student)",
+    provider: "ollama",
+    tier: "standard",
+  },
+];
+
+/** Put `ref` first (adding it if the env names an uncatalogued model). */
+function withEnvModel(options: ModelOption[], ref: ModelRef, label: string) {
+  const provider = parseModelRef(ref)?.provider ?? "ollama";
+  const hit = options.find((m) => m.ref === ref) ?? {
+    ref,
+    label,
+    provider,
+    tier: "standard" as const,
+  };
+  return [hit, ...options.filter((m) => m.ref !== ref)];
+}
+
+const CURATED_MODEL_OPTIONS: ModelOption[] = [
   { ref: "openai:gpt-4o-mini", label: "GPT-4o mini", provider: "openai", tier: "cheap" },
   { ref: "openai:gpt-4o", label: "GPT-4o", provider: "openai", tier: "standard" },
   { ref: "openai:gpt-5.6-sol", label: "GPT-5.6 Sol", provider: "openai", tier: "premium" },
@@ -157,23 +212,25 @@ export const MODEL_OPTIONS: ModelOption[] = [
     provider: "openrouter",
     tier: "cheap",
   },
-  {
-    ref: "ollama:nemotron-3.5-lightning:latest",
-    label: "Nemo Lightning (Foundry)",
-    provider: "ollama",
-    tier: "standard",
-  },
+  ...FOUNDRY_MODEL_OPTIONS,
   { ref: "ollama:llama3.2", label: "Llama 3.2 (local)", provider: "ollama", tier: "cheap" },
   { ref: "ollama:qwen2.5", label: "Qwen 2.5 (local)", provider: "ollama", tier: "cheap" },
 ];
 
-/** Cheap default model on a given channel */
+/** Curated weekend catalog — extend freely. Env-overridden PRIMARY / PRIOR_STUDENT are always listed. */
+export const MODEL_OPTIONS: ModelOption[] = withEnvModel(
+  withEnvModel(CURATED_MODEL_OPTIONS, PRIOR_STUDENT_MODEL, "Prior student (PRIOR_STUDENT_MODEL)"),
+  PRIMARY_MODEL,
+  "Foundry PRIMARY (PRIMARY_MODEL)",
+);
+
+/** Default model on a given channel. Ollama = Foundry PRIMARY (Muse), never Lightning. */
 export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderId, ModelRef> = {
   openai: "openai:gpt-4o-mini",
   anthropic: "anthropic:claude-haiku-4-5-20251001",
   xai: "xai:grok-3-mini",
   openrouter: "openrouter:openai/gpt-4o-mini",
-  ollama: "ollama:nemotron-3.5-lightning:latest",
+  ollama: PRIMARY_MODEL,
 };
 
 /** Best-effort remap when switching default channel */

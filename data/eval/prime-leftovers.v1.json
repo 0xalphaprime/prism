@@ -3,28 +3,8 @@
   "schemaVersion": 1,
   "id": "prime-leftovers.v1",
   "name": "Prime leftovers v1",
-  "description": "Compiled runtime set. Signed source lives in Foundry lora/eval-cards/<id>.json. missing-fact-8 is excluded. Empty shells are not signed cards.",
+  "description": "Compiled runtime set. Signed source lives in Foundry lora/eval-cards/<id>.json. missing-fact-8 is OUT (frozen, never signed) and is not in this set. Empty shells are not signed cards.",
   "items": [
-    {
-      "id": "missing-fact-8",
-      "split": "train",
-      "tags": [
-        "missing-facts",
-        "unsupported-certainty",
-        "polarity"
-      ],
-      "prompt": "",
-      "allowedContext": "",
-      "goldFacts": [],
-      "forbiddenClaims": [],
-      "bits": [],
-      "failureTags": [
-        "invented-fact",
-        "harness-leak",
-        "polarity-trap",
-        "unsupported-certainty"
-      ]
-    },
     {
       "id": "unsupported-certainty-1",
       "split": "train",

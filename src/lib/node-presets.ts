@@ -6,7 +6,7 @@ import type {
   PrismNodeData,
 } from "./types";
 import { newId } from "./id";
-import type { ModelRef } from "./providers";
+import { PRIMARY_MODEL, type ModelRef } from "./providers";
 
 export const NODE_PRESETS_KEY = "prism.nodePresets.v1";
 
@@ -164,7 +164,7 @@ export const BUILT_IN_PRESETS: NodePreset[] = [
         "Do the job as Prime. Omit what you don’t have. Never invent. Never mention the eval harness.",
       prompt:
         "From the architecture prompt and Hub notes only, produce the outbound draft. If a fact is missing, say we don’t have it.",
-      model: "ollama:nemotron-3.5-lightning:latest",
+      model: PRIMARY_MODEL,
       sampling: { temperature: 0.4 },
       publish: { includeInSamples: true, redactOutput: false },
     },

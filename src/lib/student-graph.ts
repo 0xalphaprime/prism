@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import type { ModelRef } from "./providers";
+import { PRIMARY_MODEL, type ModelRef } from "./providers";
 import { STUDENT_LAB_HUB } from "./student-lab";
 import type { PrismNodeData } from "./types";
 
@@ -8,7 +8,8 @@ export const STUDENT_NODE_ID = "student";
 export const INFORMED_NODE_ID = "informed";
 export const HUB_ONLY_SPECIALIST_IDS = ["teacher", "critique"] as const;
 
-export const STUDENT_MODEL: ModelRef = "ollama:nemotron-3.5-lightning:latest";
+/** Student = Foundry PRIMARY (Muse). Lightning only via PRIOR_STUDENT_MODEL on an explicit lane. */
+export const STUDENT_MODEL: ModelRef = PRIMARY_MODEL;
 export const TEACHER_MODEL: ModelRef = "openrouter:anthropic/claude-opus-5";
 export const CRITIC_MODEL: ModelRef = "openrouter:openai/gpt-5.6-sol";
 export const JUDGE_MODEL: ModelRef = "openrouter:x-ai/grok-4.6";
