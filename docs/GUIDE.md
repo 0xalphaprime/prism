@@ -256,7 +256,7 @@ Use this when you want inspectable exhaust for the local student — not a LoRA 
 | `PRIMARY_MODEL` | `muse-glimmer:30b` | Student + second-pass student, Nemo preset, eval graphs, Ollama channel default |
 | `PRIMARY_ALIAS` | `muse128` | Docs parity only — Prism doesn't read it |
 | `PRIMARY_QUANT` | `Q4_K_M` | Docs parity only — Prism doesn't read it |
-| `PRIMARY_CTX` | `131072` (128K) | Docs parity only — Prism doesn't read it |
+| `PRIMARY_CTX` | `128000` | Docs parity only — Prism doesn't read it |
 | `PRIOR_STUDENT_MODEL` | `nemotron-3.5-lightning:latest` | Explicit opt-in lanes only |
 | `OLLAMA_BASE_URL` | `http://127.0.0.1:11434/v1` | Where the Ollama refs are served |
 
