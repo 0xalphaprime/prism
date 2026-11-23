@@ -61,12 +61,101 @@ function notesReply(name, user) {
   ].join("\n");
 }
 
+const POSITIONS = {
+  "Capital allocator": "Conditional. Only if the cash position survives the worst case.",
+  "Customer voice": "Against. Customers will read it as a broken promise.",
+  Operator: "For. It can be carried out with the people and systems in place.",
+  Skeptic: "Against. The upside is assumed and the downside is not priced.",
+};
+
+function opinionReply(name, user) {
+  const ids = [...user.matchAll(/^- \[(S\d+)\]/gm)].map((m) => m[1]);
+  const cite = ids.length ? ` [${ids[0]}]${ids[2] ? ` [${ids[2]}]` : ""}` : "";
+  return [
+    `**Position:** ${POSITIONS[name] ?? "Conditional. It depends on evidence not yet in hand."}`,
+    `**Why:**`,
+    `- Stand-in opinion for ${name} (canned text, not a real model).`,
+    `- Based on the shared material${ids.length ? ` and ${ids.length} sources of my own${cite}` : " alone; no outside research"}.`,
+    `**What would change my mind:** a controlled test with a clear result.`,
+    `**What the others will probably miss:** the part of this that only ${name} is accountable for.`,
+    `**Confidence:** medium.`,
+  ].join("\n");
+}
+
+/** Says what the prompt contained, so a run shows that nothing leaked in. */
+function exposure(text) {
+  const found = [];
+  if (/# Who you are/.test(text)) found.push("a member's profile");
+  if (/# How you research/.test(text)) found.push("a member's research directives");
+  if (/Stand-in notes for/.test(text)) found.push("a member's research notes");
+  if (/Stand-in page about/.test(text)) found.push("page text");
+  return found.length ? found.join(", ") : "none";
+}
+
+function memo(kind, lines) {
+  return [
+    "## Recommendation",
+    `Stand-in ${kind} memo (canned text, not a real model). ${lines.recommendation}`,
+    "## The strongest case for",
+    lines.caseFor,
+    "## The strongest case against",
+    lines.against,
+    "## Where the disagreement lies",
+    lines.disagreement,
+    "## What is missing or unknown",
+    lines.missing,
+    "## What would change the recommendation",
+    "A controlled test with a clear result.",
+    "## Next step",
+    "Run the smallest test that could prove the recommendation wrong.",
+  ].join("\n");
+}
+
+function chairReply(system, user) {
+  const opinions = [...user.matchAll(/^## Opinion from ([^(\n]+?)(?: \(|$)/gm)].map((m) => m[1].trim());
+  const positions = opinions.map((name) => `${name}: ${(POSITIONS[name] ?? "Conditional.").split(".")[0]}`);
+  const cited = [...user.matchAll(/^Sources (.+) cited:$/gm)].map((m) => m[1]);
+  return memo("Chair", {
+    recommendation: `I read ${opinions.length} opinions: ${opinions.join(", ")}.`,
+    caseFor: positions.filter((p) => /: For/.test(p)).join("; ") || "No member argued for it outright.",
+    against: positions.filter((p) => /: Against/.test(p)).join("; ") || "No member argued against it outright.",
+    disagreement: `Positions were ${positions.join("; ")}.`,
+    missing: `Sources were cited by: ${cited.join(", ") || "nobody"}. Other things in my prompt (should be none): ${exposure(`${system}\n${user}`)}.`,
+  });
+}
+
+function generalistReply(system, user) {
+  const sources = sourcesIn(user);
+  return memo("generalist", {
+    recommendation: "Conditional.",
+    caseFor: "It may raise revenue per customer.",
+    against: "It may cost customers.",
+    disagreement: "A single adviser has no one to disagree with; these are the two sides I can see.",
+    missing: `I read ${sources.length} sources of my own. Member material in my prompt (should be none): ${exposure(`${system}\n${user}`).replace("page text", "").replace(/^, |, $/g, "") || "none"}.`,
+  });
+}
+
+function generalistPlanReply(user) {
+  const max = Number(user.match(/up to (\d+) web searches/)?.[1] ?? 4);
+  const queries = [
+    SHARED_QUERY,
+    "price increase effect on revenue and retention",
+    "how to announce a price increase",
+    "price increase failures case studies",
+    "pricing change rollout risks",
+  ].map((query) => ({ query, why: "Stand-in: a search the generalist would run." }));
+  return JSON.stringify({ queries: queries.slice(0, max) });
+}
+
 function reply(system, user) {
-  const name = system.match(/^You are ([^,\n]+),/)?.[1] ?? "Unknown";
+  const name = system.match(/^You are (?:the )?([^,.\n]+)/)?.[1] ?? "Unknown";
   const task = [...user.matchAll(/^# Your task: (.+)$/gm)].pop()?.[1] ?? "";
   let content;
-  if (task === "search plan") content = planReply(name, user);
+  if (task === "search plan") content = name === "Generalist" ? generalistPlanReply(user) : planReply(name, user);
   else if (task === "research notes") content = notesReply(name, user);
+  else if (task === "opinion") content = opinionReply(name, user);
+  else if (task === "board memo") content = chairReply(system, user);
+  else if (task === "generalist memo") content = generalistReply(system, user);
   else content = `Stand-in reply for ${name}. Task: ${task || "none given"}.`;
   return { name, task, content };
 }
