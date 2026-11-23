@@ -267,3 +267,47 @@ export type SessionSummary = {
   /** `finished` once the Chair memo is written (board) or all research is in (trial). */
   finished: boolean;
 };
+
+/* ---------- Decisions ---------- */
+
+export type DecisionStatus = "undecided" | "decided" | "parked" | "dropped";
+
+/** Stored as `decision.json` in the session's folder. What the owner did with the advice. */
+export type DecisionRecord = {
+  status: DecisionStatus;
+  /** What was decided, in the owner's words. */
+  choice: string;
+  rationale: string;
+  /** `YYYY-MM-DD`: when to come back and check how it went. */
+  reviewOn?: string;
+  /** What actually happened, filled in at review. */
+  outcome: string;
+  decidedAt?: number;
+  updatedAt: number;
+};
+
+export type DecisionDraft = {
+  status?: DecisionStatus;
+  choice?: string;
+  rationale?: string;
+  reviewOn?: string;
+  outcome?: string;
+};
+
+export type DecisionRow = {
+  id: string;
+  title: string;
+  question: string;
+  createdAt: number;
+  speed?: SessionSpeed;
+  members: string[];
+  /** True once the Chair's memo is written. */
+  sessionFinished: boolean;
+  /** The Chair's recommendation, if the memo has one. */
+  recommendation: string | null;
+  decision: DecisionRecord;
+  /** Why this still needs the owner, or null when nothing is outstanding. */
+  looseEnd: string | null;
+  /** The hand-off file, if one has been written. */
+  handoff: string | null;
+};
