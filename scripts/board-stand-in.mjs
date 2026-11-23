@@ -45,7 +45,100 @@ function planReply(name, user) {
   if (named && name === "Skeptic") {
     queries.splice(1, 0, { query: `${named[1]} complaints`, why: "Stand-in: repeats a name from the material." });
   }
+  // A member allowed to search the owner's own records asks for one such search.
+  if (/"where":"own"/.test(user)) {
+    queries.splice(1, 0, { query: "pricing history", why: "Stand-in: a search of the owner's own records.", where: "own" });
+  }
   return JSON.stringify({ queries: queries.slice(0, max) });
+}
+
+const OPEN_POINTS = [
+  { point: "Would existing customers leave after the change?", settle: "Churn figures from comparable changes." },
+  { point: "Can the change be carried out with the systems already in place?", settle: "A dry run on a small group." },
+];
+
+function plan2Reply(name, user) {
+  const max = Number(user.match(/up to (\d+) web searches/)?.[1] ?? 4);
+  const points = [...user.matchAll(/^- (D\d+): /gm)].map((m) => m[1]);
+  const queries = [
+    { query: "churn figures from comparable price changes", why: `Stand-in: aimed at ${points[0] ?? "the first open point"}; every member asks it.` },
+    { query: `${name.toLowerCase()} evidence on dry runs of pricing changes`, why: `Stand-in: aimed at ${points[1] ?? "the second open point"}, from ${name}'s angle.` },
+  ];
+  return JSON.stringify({ queries: queries.slice(0, max) });
+}
+
+/** Names of members whose opinions appear in a prompt. A blind step should list none. */
+function opinionsSeen(user) {
+  return [...user.matchAll(/^## Opinion from ([^(\n,]+?)(?: \(|,|$)/gm)].map((m) => m[1].trim());
+}
+
+function revisedReply(name, user) {
+  const ids = sourcesIn(user).map((s) => s.id);
+  const seen = opinionsSeen(user);
+  return [
+    `**Position:** ${POSITIONS[name] ?? "Conditional. It depends on evidence not yet in hand."}`,
+    `**What changed:** Nothing. Stand-in revised opinion for ${name} (canned text, not a real model). I read ${ids.length} new sources${ids.length ? ` (${ids[0]} to ${ids[ids.length - 1]})` : ""}.`,
+    `**Why:**`,
+    `- The second round was aimed at ${[...user.matchAll(/^- (D\d+): /gm)].length} open points from the Chair.`,
+    `- Other members' opinions in my prompt (should be none): ${seen.join(", ") || "none"}.`,
+    `**What would change my mind:** a controlled test with a clear result.`,
+    `**Confidence:** medium.`,
+  ].join("\n");
+}
+
+function premortemReply(name, user) {
+  const seen = opinionsSeen(user);
+  return [
+    `**What went wrong:** Stand-in premortem for ${name} (canned text, not a real model). The plan was followed and the main assumption did not hold.`,
+    `**The early sign:** the first month's numbers moved the wrong way and nobody was assigned to watch them.`,
+    `**The guard:** agree now what result in the first month means stop.`,
+    `**Does this change my position:** no. Other members' opinions in my prompt (should be none): ${seen.join(", ") || "none"}.`,
+  ].join("\n");
+}
+
+function crossReply(name, user) {
+  const others = opinionsSeen(user);
+  return [
+    `**Where they are wrong:** Stand-in cross-examination by ${name} (canned text, not a real model). I read the opinions of: ${others.join(", ") || "nobody"}.`,
+    `**Where they are right:** ${others[0] ?? "Nobody"} saw a risk I had not priced.`,
+    `**The question I would put to them:** ${others[others.length - 1] ?? "Nobody"}, what result would make you change sides?`,
+    `**My position now:** unchanged.`,
+  ].join("\n");
+}
+
+function mapReply(user) {
+  const seen = opinionsSeen(user);
+  return JSON.stringify({ points: seen.length > 1 ? OPEN_POINTS : [] });
+}
+
+function lessonsReply(name) {
+  return JSON.stringify({
+    lessons: [
+      `Stand-in lesson for ${name}: ask for the base rate before forming a view.`,
+      `Stand-in lesson for ${name}: say what result would change my mind before the evidence is in.`,
+    ],
+  });
+}
+
+function interviewReply(task, user) {
+  const asked = [...user.matchAll(/^You asked: /gm)].length;
+  const answers = [...user.matchAll(/^Owner: (.+)$/gm)].map((m) => m[1]);
+  if (task === "next question" && asked < 2) {
+    return JSON.stringify({
+      question:
+        asked === 0
+          ? "Stand-in question 1: what should this member catch that nobody else on your board would?"
+          : "Stand-in question 2: where would this member go looking for evidence?",
+    });
+  }
+  return JSON.stringify({
+    draft: {
+      name: "Regulatory eye",
+      title: "Accountable for what the rules allow and what they are about to stop allowing.",
+      profile: `Stand-in profile (canned text, not a real model). You have spent years reading rules before others knew they mattered. The owner told the interviewer: ${answers.join(" / ") || "nothing yet"}.`,
+      directives: "- Start with the regulator's own publications.\n- Distrust summaries written by vendors.\n- Look for enforcement actions, not guidance.",
+    },
+  });
 }
 
 function sourcesIn(user) {
@@ -112,11 +205,21 @@ function memo(kind, lines) {
 }
 
 function chairReply(system, user) {
-  const opinions = [...user.matchAll(/^## Opinion from ([^(\n]+?)(?: \(|$)/gm)].map((m) => m[1].trim());
+  const opinions = opinionsSeen(user);
   const positions = opinions.map((name) => `${name}: ${(POSITIONS[name] ?? "Conditional.").split(".")[0]}`);
   const cited = [...user.matchAll(/^Sources (.+) cited:$/gm)].map((m) => m[1]);
+  const revised = [...user.matchAll(/^## Opinion from .+, revised after a second round of research$/gm)].length;
+  const crossed = [...user.matchAll(/^## .+ on the other opinions$/gm)].length;
+  const premortems = [...user.matchAll(/^## Premortem from /gm)].length;
+  const later = [
+    revised ? `${revised} of the opinions were revised after a second round.` : "",
+    crossed ? `I read ${crossed} cross-examinations.` : "",
+    premortems ? `I read ${premortems} premortems.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return memo("Chair", {
-    recommendation: `I read ${opinions.length} opinions: ${opinions.join(", ")}.`,
+    recommendation: `I read ${opinions.length} opinions: ${opinions.join(", ")}.${later ? ` ${later}` : ""}`,
     caseFor: positions.filter((p) => /: For/.test(p)).join("; ") || "No member argued for it outright.",
     against: positions.filter((p) => /: Against/.test(p)).join("; ") || "No member argued against it outright.",
     disagreement: `Positions were ${positions.join("; ")}.`,
@@ -156,6 +259,13 @@ function reply(system, user) {
   else if (task === "opinion") content = opinionReply(name, user);
   else if (task === "board memo") content = chairReply(system, user);
   else if (task === "generalist memo") content = generalistReply(system, user);
+  else if (task === "disagreement map") content = mapReply(user);
+  else if (task === "second search plan") content = plan2Reply(name, user);
+  else if (task === "revised opinion") content = revisedReply(name, user);
+  else if (task === "premortem") content = premortemReply(name, user);
+  else if (task === "cross-examination") content = crossReply(name, user);
+  else if (task === "lessons") content = lessonsReply(name);
+  else if (task === "next question" || task === "member draft") content = interviewReply(task, user);
   else content = `Stand-in reply for ${name}. Task: ${task || "none given"}.`;
   return { name, task, content };
 }
