@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       profile: body.profile ?? "",
       directives: body.directives ?? "",
       model: body.model,
+      sources: body.sources,
     });
     return NextResponse.json({ member });
   } catch (error) {
