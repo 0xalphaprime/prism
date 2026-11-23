@@ -162,6 +162,9 @@ export function ArchitectureBar() {
         </Link>
 
         <div className="architecture-actions">
+          <Link href="/board" className="btn" title="Your board of members">
+            Board
+          </Link>
           <Link href="/connections" className="btn">
             Connections
           </Link>
