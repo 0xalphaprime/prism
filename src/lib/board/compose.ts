@@ -644,7 +644,14 @@ export function lessonsPrompt(args: {
     "Reply with JSON only, in this shape:",
     '{"lessons":["the lesson"]}',
   ].filter((part, i, all) => !(part === "" && all[i - 1] === ""));
-  const saw = [...who.saw, "The decision", "Own opinion", "The Chair's memo", "The owner's decision record"];
+  const recorded = d.status !== "undecided" || Boolean(d.choice || d.rationale || d.outcome);
+  const saw = [
+    ...who.saw,
+    "The decision",
+    "Own opinion",
+    "The Chair's memo",
+    recorded ? "The owner's decision record" : "The owner's decision record (nothing recorded yet)",
+  ];
   return { system: who.text, user: parts.join("\n"), saw, maxTokens: 700 };
 }
 
