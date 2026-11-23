@@ -780,7 +780,8 @@ export async function fetchUrlContent(url: string): Promise<{
   const key = process.env.FIRECRAWL_API_KEY ?? "";
   if (key) {
     try {
-      const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      const base = (process.env.FIRECRAWL_BASE_URL?.trim() || "https://api.firecrawl.dev").replace(/\/+$/, "");
+      const res = await fetch(`${base}/v1/scrape`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
