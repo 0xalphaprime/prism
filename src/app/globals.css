@@ -3980,3 +3980,151 @@ a.btn {
 .board-workspace.is-wide {
   max-width: 1680px;
 }
+
+/* Board: full sessions */
+
+.board-memos {
+  display: grid;
+  gap: 0.9rem;
+  align-items: start;
+}
+
+.board-memos.is-pair {
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+}
+
+.board-memo {
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  padding: 0.9rem 1.1rem 1rem;
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.board-memo[data-seat="generalist"] {
+  border-color: var(--line-strong);
+}
+
+.board-generalist-research {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+}
+
+.board-seat.is-dropped {
+  opacity: 0.7;
+}
+
+.board-opinion {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-node);
+  padding: 0.65rem 0.8rem;
+}
+
+.board-sealed {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px dashed var(--line-strong);
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.board-prose-rich {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.board-prose-rich p,
+.board-prose-rich ul,
+.board-prose-rich ol {
+  margin: 0;
+}
+
+.board-prose-rich ul,
+.board-prose-rich ol {
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.board-prose-heading {
+  font-weight: 650;
+  color: var(--ink);
+  margin-top: 0.35rem !important;
+}
+
+.board-prose-heading.is-h1 {
+  font-size: 1.05rem;
+}
+
+.board-prose-heading.is-h2 {
+  font-size: 0.98rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.55rem;
+}
+
+.board-prose-heading.is-h2:first-child {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0 !important;
+}
+
+.board-who summary,
+.board-standing summary {
+  cursor: pointer;
+}
+
+.board-who summary h2,
+.board-standing summary h2 {
+  display: inline;
+}
+
+.board-who table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.board-who th,
+.board-who td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.35rem 0.6rem 0.35rem 0;
+  border-top: 1px solid var(--line);
+  line-height: 1.45;
+}
+
+.board-who th {
+  color: var(--ink-faint);
+  font-weight: 600;
+  border-top: 0;
+}
+
+.board-who td:first-child,
+.board-who td:nth-child(2) {
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+.board-standing-text {
+  width: 100%;
+  min-height: 9rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-node);
+  color: var(--ink);
+  padding: 0.6rem 0.75rem;
+  outline: none;
+}
+
+.board-standing-text:focus {
+  border-color: var(--accent);
+}
