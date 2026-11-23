@@ -512,6 +512,7 @@ describe("lessons for a member's living file", () => {
     assert.ok(!call.user.includes("FIRST-OPINION-BY-SKEPTIC"));
     const lessons = (await readSessionView(meta.id, root)).members[0].lessons;
     assert.deepEqual(lessons?.proposals.map((p) => [p.id, p.status]), [["L1", "proposed"], ["L2", "proposed"]]);
+    assert.equal(lessons?.state.saw?.at(-1), "The owner's decision record");
     // Nothing has been written to the member yet.
     assert.equal((await readMember("operator", root))?.files.find((f) => f.name === "lessons.md"), undefined);
   });
@@ -521,6 +522,10 @@ describe("lessons for a member's living file", () => {
     const { deps } = stubs();
     await runChairStep(meta.id, deps);
     await proposeLessons(meta.id, "operator", deps);
+    assert.equal(
+      (await readSessionView(meta.id, root)).members[0].lessons?.state.saw?.at(-1),
+      "The owner's decision record (nothing recorded yet)",
+    );
 
     await decideLesson(meta.id, "operator", "L2", { approve: false }, root, 2_000);
     assert.equal((await readMember("operator", root))?.files.find((f) => f.name === "lessons.md"), undefined);
