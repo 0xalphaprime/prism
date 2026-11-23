@@ -3625,6 +3625,9 @@ a.btn {
 }
 
 .board-pick input {
+  width: auto;
+  flex: none;
+  padding: 0;
   margin-top: 0.2rem;
   accent-color: var(--accent);
 }
