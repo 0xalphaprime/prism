@@ -41,6 +41,9 @@ yarn-error.log*
 /data/student-lab-last-run.json
 /data/eval/experiments/
 
+# board members, sessions and decisions (private; never commit)
+/data/board/
+
 # vercel
 .vercel
 
