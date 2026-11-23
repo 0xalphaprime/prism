@@ -89,7 +89,7 @@ function requireFileName(raw: unknown): string {
   return name;
 }
 
-async function exists(target: string) {
+export async function exists(target: string) {
   try {
     await stat(target);
     return true;
@@ -98,7 +98,7 @@ async function exists(target: string) {
   }
 }
 
-async function readText(file: string): Promise<string> {
+export async function readText(file: string): Promise<string> {
   try {
     return await readFile(file, "utf8");
   } catch {
@@ -107,7 +107,7 @@ async function readText(file: string): Promise<string> {
 }
 
 /** Write through a temp file so a crash never leaves a half-written file. */
-async function writeText(file: string, text: string) {
+export async function writeText(file: string, text: string) {
   await mkdir(path.dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tmp, text, "utf8");
