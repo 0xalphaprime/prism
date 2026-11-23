@@ -1,12 +1,14 @@
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { STARTER_MEMBERS } from "./starters";
-import type {
-  Member,
-  MemberDraft,
-  MemberFile,
-  MemberMeta,
-  MemberSummary,
+import {
+  OWN_SOURCES,
+  type Member,
+  type MemberDraft,
+  type MemberFile,
+  type MemberMeta,
+  type MemberSummary,
+  type OwnSource,
 } from "./types";
 
 /**
@@ -122,6 +124,13 @@ function clip(text: unknown, label: string): string {
   return text;
 }
 
+/** Keeps only the own-record sources this app knows, in a fixed order. Undefined when there are none. */
+export function cleanSources(raw: unknown): OwnSource[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const picked = OWN_SOURCES.filter((source) => raw.includes(source));
+  return picked.length ? picked : undefined;
+}
+
 function nameFromSlug(slug: string) {
   const words = slug.replace(/-+/g, " ").trim();
   return words ? words[0].toUpperCase() + words.slice(1) : slug;
@@ -148,6 +157,7 @@ async function readMeta(slug: string, root: string): Promise<MemberMeta | null> 
     name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : nameFromSlug(slug),
     title: typeof parsed.title === "string" ? parsed.title : "",
     model: typeof parsed.model === "string" && parsed.model ? parsed.model : undefined,
+    sources: cleanSources(parsed.sources),
     createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : fallbackTime,
     updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : fallbackTime,
   };
@@ -261,6 +271,7 @@ export async function createMember(
     name,
     title: cleanTitle(draft.title),
     model: draft.model?.trim() || undefined,
+    sources: cleanSources(draft.sources),
     createdAt: now,
     updatedAt: now,
   };
@@ -281,7 +292,7 @@ export async function createMember(
 
 export async function updateMember(
   slug: string,
-  patch: Partial<Pick<MemberDraft, "name" | "title" | "profile" | "directives" | "model">>,
+  patch: Partial<Pick<MemberDraft, "name" | "title" | "profile" | "directives" | "model" | "sources">>,
   root = boardRoot(),
   now = Date.now(),
 ): Promise<Member> {
@@ -293,6 +304,7 @@ export async function updateMember(
     name: patch.name !== undefined ? cleanName(patch.name) : meta.name,
     title: patch.title !== undefined ? cleanTitle(patch.title) : meta.title,
     model: patch.model !== undefined ? patch.model.trim() || undefined : meta.model,
+    sources: patch.sources !== undefined ? cleanSources(patch.sources) : meta.sources,
     updatedAt: now,
   };
   if (patch.profile !== undefined) {
@@ -324,6 +336,7 @@ export async function duplicateMember(
       profile: source.profile,
       directives: source.directives,
       model: source.model,
+      sources: source.sources,
       files: source.files.map((f) => ({ name: f.name, content: f.content })),
     },
     root,
