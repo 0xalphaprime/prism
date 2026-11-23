@@ -123,14 +123,32 @@ export type ResearchRecord = {
   pages: PageRecord[];
 };
 
-export type MemberStepName = "plan" | "research" | "notes";
+export type MemberStepName = "plan" | "research" | "notes" | "opinion";
 
 export type SeatState = {
   steps: Record<MemberStepName, StepState>;
+  /** The owner chose to go on without this member. */
+  dropped?: boolean;
 };
 
-/** `trial` runs research only, for tuning a member's directives. */
-export type SessionKind = "trial";
+export type GeneralistStepName = "plan" | "research" | "memo";
+
+export type GeneralistState = {
+  steps: Record<GeneralistStepName, StepState>;
+};
+
+export type ChairState = {
+  memo: StepState;
+};
+
+/**
+ * `trial` runs research only, for tuning a member's directives.
+ * `board` is a full session: research, blind opinions, Chair memo.
+ */
+export type SessionKind = "trial" | "board";
+
+/** `fast`: no outside research, one or two members. `standard`: the full flow. */
+export type SessionSpeed = "fast" | "standard";
 
 export type SessionSeat = {
   slug: string;
@@ -147,6 +165,11 @@ export type SessionMeta = {
   question: string;
   /** The material every member reads. */
   material: string;
+  /** Standing context about the owner, copied in when the session started. */
+  standing?: string;
+  speed?: SessionSpeed;
+  /** Also run one generalist on the same material with the same search allowance. */
+  withGeneralist?: boolean;
   /** Marks the decision as sensitive: searches always wait for approval. */
   sensitive: boolean;
   approveSearches: boolean;
@@ -163,6 +186,8 @@ export type SessionDraft = {
   title?: string;
   question: string;
   material?: string;
+  speed?: SessionSpeed;
+  withGeneralist?: boolean;
   sensitive?: boolean;
   approveSearches?: boolean;
   model: string;
@@ -185,7 +210,23 @@ export type SessionMemberView = SessionSeat & {
   state: SeatState;
   plan: MemberPlan | null;
   research: ResearchRecord | null;
+  /** Null while sealed, even if written. */
   notes: string | null;
+  /** Null while sealed, even if written. */
+  opinion: string | null;
+};
+
+export type GeneralistView = {
+  state: GeneralistState;
+  plan: MemberPlan | null;
+  research: ResearchRecord | null;
+  memo: string | null;
+  limits: ResearchLimits;
+};
+
+export type ChairView = {
+  state: ChairState;
+  memo: string | null;
 };
 
 export type OverlapReport = {
@@ -200,8 +241,18 @@ export type OverlapReport = {
 
 export type SessionView = Omit<SessionMeta, "members"> & {
   members: SessionMemberView[];
+  /**
+   * True in a board session until every member still taking part has given an
+   * opinion. While sealed, notes and opinions are left out of what the screen
+   * is sent.
+   */
+  sealed: boolean;
+  chair: ChairView | null;
+  generalist: GeneralistView | null;
   overlap: OverlapReport;
   dir: string;
+  /** When this view was read from disk. The screen ignores a view older than the one it shows. */
+  readAt: number;
 };
 
 export type SessionSummary = {
@@ -212,4 +263,7 @@ export type SessionSummary = {
   createdAt: number;
   members: string[];
   sensitive: boolean;
+  speed?: SessionSpeed;
+  /** `finished` once the Chair memo is written (board) or all research is in (trial). */
+  finished: boolean;
 };

@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { boardApi, errorText } from "@/components/board/board-api";
-import { nextMove, useSession, type StepRequest } from "@/components/board/use-session";
+import { Prose } from "@/components/board/prose";
+import {
+  allMoves,
+  opinionCount,
+  useSession,
+  type StepRequest,
+} from "@/components/board/use-session";
 import { modelLabel } from "@/lib/providers";
 import type {
+  GeneralistView,
   MemberPlan,
   OverlapReport,
   PlannedQuery,
@@ -16,11 +23,7 @@ import type {
   StepState,
 } from "@/lib/board/types";
 
-const STEP_LABEL: Record<string, string> = {
-  plan: "Search plan",
-  research: "Research",
-  notes: "Notes",
-};
+type Run = (request: StepRequest) => void;
 
 const STATUS_LABEL: Record<StepState["status"], string> = {
   idle: "Not started",
@@ -75,7 +78,7 @@ function StepError({
 }: {
   state: StepState;
   onRetry: () => void;
-  children?: React.ReactNode;
+  children?: ReactNode;
 }) {
   if (state.status !== "error") return null;
   return (
@@ -92,34 +95,39 @@ function StepError({
 }
 
 function PlanSection({
-  member,
+  plan,
+  planStep,
+  researchStep,
   limit,
-  run,
+  onRetry,
+  onApprove,
+  onSkip,
 }: {
-  member: SessionMemberView;
+  plan: MemberPlan | null;
+  planStep: StepState;
+  researchStep: StepState;
   limit: number;
-  run: (request: StepRequest) => void;
+  onRetry: () => void;
+  onApprove: (queries: PlannedQuery[]) => void;
+  onSkip: () => void;
 }) {
-  const plan = member.plan;
-  const { plan: planStep, research } = member.state.steps;
-  const held = Boolean(plan && !plan.approved && research.status === "idle" && planStep.status === "done");
+  const held = Boolean(plan && !plan.approved && researchStep.status === "idle" && planStep.status === "done");
   const [draft, setDraft] = useState<{ source: MemberPlan; queries: PlannedQuery[] } | null>(null);
   const queries = held && draft && draft.source === plan ? draft.queries : (plan?.queries ?? []);
   const edit = (next: PlannedQuery[]) => plan && setDraft({ source: plan, queries: next });
   const flaggedFor = (query: string) => plan?.flagged.find((f) => f.query === query)?.terms ?? [];
 
+  if (planStep.status === "skipped") return null;
   return (
     <section className="board-section">
       <h3>Search plan</h3>
       {planStep.status === "idle" ? <p className="sheet-help">Not written yet.</p> : null}
       {planStep.status === "running" ? <p className="sheet-help">Deciding what to look for…</p> : null}
-      <StepError state={planStep} onRetry={() => run({ step: "plan", member: member.slug })} />
+      <StepError state={planStep} onRetry={onRetry} />
 
       {plan && planStep.status === "done" ? (
         <>
-          {plan.queries.length === 0 && !held ? (
-            <p className="sheet-help">This member chose not to search.</p>
-          ) : null}
+          {plan.queries.length === 0 && !held ? <p className="sheet-help">Chose not to search.</p> : null}
           {held ? (
             <p className="board-hold">
               {plan.flagged.length
@@ -139,11 +147,7 @@ function PlanSection({
                         edit(queries.map((item, j) => (j === i ? { ...item, query: e.target.value } : item)))
                       }
                     />
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => edit(queries.filter((_, j) => j !== i))}
-                    >
+                    <button type="button" className="btn" onClick={() => edit(queries.filter((_, j) => j !== i))}>
                       Remove
                     </button>
                   </div>
@@ -152,22 +156,14 @@ function PlanSection({
                 )}
                 {q.why ? <span className="board-why">{q.why}</span> : null}
                 {flaggedFor(q.query).length ? (
-                  <span className="board-flag">
-                    Repeats from your material: {flaggedFor(q.query).join(", ")}
-                  </span>
+                  <span className="board-flag">Repeats from your material: {flaggedFor(q.query).join(", ")}</span>
                 ) : null}
               </li>
             ))}
           </ol>
           {held ? (
             <div className="board-actions">
-              <button
-                type="button"
-                className="btn btn-accent"
-                onClick={() =>
-                  run({ step: "research", member: member.slug, body: { approve: true, queries } })
-                }
-              >
+              <button type="button" className="btn btn-accent" onClick={() => onApprove(queries)}>
                 Approve and search
               </button>
               {queries.length < limit ? (
@@ -175,11 +171,7 @@ function PlanSection({
                   Add a search
                 </button>
               ) : null}
-              <button
-                type="button"
-                className="btn"
-                onClick={() => run({ step: "skip-research", member: member.slug })}
-              >
+              <button type="button" className="btn" onClick={onSkip}>
                 Skip research
               </button>
             </div>
@@ -248,42 +240,40 @@ export function ResearchTrail({ record }: { record: ResearchRecord }) {
 }
 
 function ResearchSection({
-  member,
-  run,
+  step,
+  record,
+  onRetry,
+  onSkip,
 }: {
-  member: SessionMemberView;
-  run: (request: StepRequest) => void;
+  step: StepState;
+  record: ResearchRecord | null;
+  onRetry: () => void;
+  onSkip: () => void;
 }) {
-  const step = member.state.steps.research;
+  if (step.status === "skipped" && !record) {
+    return (
+      <section className="board-section">
+        <h3>Research</h3>
+        <p className="sheet-help">No outside research. Working from the shared material alone.</p>
+      </section>
+    );
+  }
   return (
     <section className="board-section">
       <h3>Research trail</h3>
       {step.status === "idle" ? <p className="sheet-help">Nothing searched yet.</p> : null}
       {step.status === "running" ? <p className="sheet-help">Searching and reading…</p> : null}
-      {step.status === "skipped" ? (
-        <p className="sheet-help">Skipped. This member works from the shared material alone.</p>
-      ) : null}
-      <StepError state={step} onRetry={() => run({ step: "research", member: member.slug })}>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => run({ step: "skip-research", member: member.slug })}
-        >
+      <StepError state={step} onRetry={onRetry}>
+        <button type="button" className="btn" onClick={onSkip}>
           Continue without research
         </button>
       </StepError>
-      {member.research && step.status !== "running" ? <ResearchTrail record={member.research} /> : null}
+      {record && step.status !== "running" ? <ResearchTrail record={record} /> : null}
     </section>
   );
 }
 
-function NotesSection({
-  member,
-  run,
-}: {
-  member: SessionMemberView;
-  run: (request: StepRequest) => void;
-}) {
+function NotesSection({ member, sealed, run }: { member: SessionMemberView; sealed: boolean; run: Run }) {
   const step = member.state.steps.notes;
   if (step.status === "skipped") return null;
   return (
@@ -292,9 +282,37 @@ function NotesSection({
       {step.status === "idle" ? <p className="sheet-help">Written after research.</p> : null}
       {step.status === "running" ? <p className="sheet-help">Writing notes…</p> : null}
       <StepError state={step} onRetry={() => run({ step: "notes", member: member.slug })} />
+      {step.status === "done" && sealed ? (
+        <p className="board-sealed">Written. Sealed until every member has given an opinion.</p>
+      ) : null}
       {member.notes && step.status === "done" ? (
         <>
-          <div className="board-prose">{member.notes.trim()}</div>
+          <Prose text={member.notes} />
+          <SawList state={step} />
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+function OpinionSection({ member, sealed, run }: { member: SessionMemberView; sealed: boolean; run: Run }) {
+  const step = member.state.steps.opinion;
+  return (
+    <section className="board-section board-opinion">
+      <h3>Opinion</h3>
+      {step.status === "idle" ? <p className="sheet-help">Given after research, without seeing anyone else&apos;s.</p> : null}
+      {step.status === "running" ? <p className="sheet-help">Writing an opinion…</p> : null}
+      <StepError state={step} onRetry={() => run({ step: "opinion", member: member.slug })}>
+        <button type="button" className="btn" onClick={() => run({ step: "drop", member: member.slug })}>
+          Continue without this member
+        </button>
+      </StepError>
+      {step.status === "done" && sealed ? (
+        <p className="board-sealed">Opinion is in. Sealed until every member has answered.</p>
+      ) : null}
+      {member.opinion && step.status === "done" ? (
+        <>
+          <Prose text={member.opinion} />
           <SawList state={step} />
         </>
       ) : null}
@@ -332,43 +350,196 @@ export function OverlapCard({ overlap, view }: { overlap: OverlapReport; view: S
   );
 }
 
-function MemberColumn({
-  member,
-  view,
-  run,
-}: {
-  member: SessionMemberView;
-  view: SessionView;
-  run: (request: StepRequest) => void;
-}) {
+function MemberColumn({ member, view, run }: { member: SessionMemberView; view: SessionView; run: Run }) {
   const steps = member.state.steps;
+  const board = view.kind === "board";
+  const slug = member.slug;
+  const chips: Array<[string, StepState]> = [
+    ["Search plan", steps.plan],
+    ["Research", steps.research],
+    ["Notes", steps.notes],
+  ];
+  if (board) chips.push(["Opinion", steps.opinion]);
+  const dropped = Boolean(member.state.dropped);
+
   return (
-    <article className="board-seat" data-member={member.slug}>
+    <article className={`board-seat${dropped ? " is-dropped" : ""}`} data-member={slug}>
       <header className="board-seat-head">
         <div>
           <h2>{member.name}</h2>
           <p className="board-member-title">{member.title}</p>
         </div>
-        <Link href={`/board/members?m=${member.slug}`} className="board-seat-link">
+        <Link href={`/board/members?m=${slug}`} className="board-seat-link">
           Edit member
         </Link>
       </header>
+      {dropped ? (
+        <div className="board-hold">
+          Left out of this session. The Chair does not read this member.
+          <div className="board-actions">
+            <button type="button" className="btn" onClick={() => run({ step: "restore", member: slug })}>
+              Bring back
+            </button>
+          </div>
+        </div>
+      ) : null}
       <div className="board-steps">
-        {(["plan", "research", "notes"] as const).map((name) => (
-          <StepChip key={name} label={STEP_LABEL[name]} state={steps[name]} />
+        {chips.map(([label, state]) => (
+          <StepChip key={label} label={label} state={state} />
         ))}
       </div>
-      <PlanSection member={member} limit={view.limits.searches} run={run} />
-      <ResearchSection member={member} run={run} />
-      <NotesSection member={member} run={run} />
-      {steps.plan.status === "done" ? (
+      {board ? <OpinionSection member={member} sealed={view.sealed} run={run} /> : null}
+      <PlanSection
+        plan={member.plan}
+        planStep={steps.plan}
+        researchStep={steps.research}
+        limit={view.limits.searches}
+        onRetry={() => run({ step: "plan", member: slug })}
+        onApprove={(queries) => run({ step: "research", member: slug, body: { approve: true, queries } })}
+        onSkip={() => run({ step: "skip-research", member: slug })}
+      />
+      <ResearchSection
+        step={steps.research}
+        record={member.research}
+        onRetry={() => run({ step: "research", member: slug })}
+        onSkip={() => run({ step: "skip-research", member: slug })}
+      />
+      <NotesSection member={member} sealed={view.sealed} run={run} />
+      {steps.plan.status === "done" && !dropped ? (
         <div className="board-actions board-seat-foot">
-          <button type="button" className="btn" onClick={() => run({ step: "plan", member: member.slug })}>
+          <button type="button" className="btn" onClick={() => run({ step: "plan", member: slug })}>
             Start this member again
           </button>
         </div>
       ) : null}
     </article>
+  );
+}
+
+function ChairCard({ view, run }: { view: SessionView; run: Run }) {
+  if (!view.chair) return null;
+  const memo = view.chair.state.memo;
+  const { done, total } = opinionCount(view);
+  return (
+    <article className="board-memo" data-seat="chair">
+      <header className="board-seat-head">
+        <div>
+          <h2>The board (Chair&apos;s memo)</h2>
+          <p className="board-member-title">
+            Reads every opinion and the sources they cite. Does not read the members&apos; notes.
+          </p>
+        </div>
+        <StepChip label="Memo" state={memo} />
+      </header>
+      {memo.status === "idle" ? (
+        <p className="sheet-help">
+          Written once every opinion is in ({done} of {total} so far).
+        </p>
+      ) : null}
+      {memo.status === "running" ? <p className="sheet-help">Reading the opinions…</p> : null}
+      <StepError state={memo} onRetry={() => run({ step: "chair" })} />
+      {view.chair.memo && memo.status === "done" ? (
+        <>
+          <Prose text={view.chair.memo} />
+          <SawList state={memo} />
+          <div className="board-actions">
+            <button type="button" className="btn" onClick={() => run({ step: "chair" })}>
+              Write the memo again
+            </button>
+          </div>
+        </>
+      ) : null}
+    </article>
+  );
+}
+
+function GeneralistCard({ generalist, run }: { generalist: GeneralistView; run: Run }) {
+  const { plan, research, memo } = generalist.state.steps;
+  return (
+    <article className="board-memo" data-seat="generalist">
+      <header className="board-seat-head">
+        <div>
+          <h2>The generalist</h2>
+          <p className="board-member-title">
+            One adviser, same material, up to {generalist.limits.searches} searches (the members&apos;
+            allowance added together).
+          </p>
+        </div>
+        <StepChip label="Memo" state={memo} />
+      </header>
+      {memo.status === "idle" && research.status !== "error" && plan.status !== "error" ? (
+        <p className="sheet-help">Written after its own research.</p>
+      ) : null}
+      {memo.status === "running" ? <p className="sheet-help">Writing the memo…</p> : null}
+      <StepError state={memo} onRetry={() => run({ step: "generalist-memo" })} />
+      {generalist.memo && memo.status === "done" ? (
+        <>
+          <Prose text={generalist.memo} />
+          <SawList state={memo} />
+        </>
+      ) : null}
+      <details className="board-page" open={Boolean(generalist.plan && !generalist.plan.approved) || research.status === "error" || plan.status === "error"}>
+        <summary>The generalist&apos;s research</summary>
+        <div className="board-generalist-research">
+          <PlanSection
+            plan={generalist.plan}
+            planStep={plan}
+            researchStep={research}
+            limit={generalist.limits.searches}
+            onRetry={() => run({ step: "generalist-plan" })}
+            onApprove={(queries) => run({ step: "generalist-research", body: { approve: true, queries } })}
+            onSkip={() => run({ step: "generalist-skip-research" })}
+          />
+          <ResearchSection
+            step={research}
+            record={generalist.research}
+            onRetry={() => run({ step: "generalist-research" })}
+            onSkip={() => run({ step: "generalist-skip-research" })}
+          />
+        </div>
+      </details>
+    </article>
+  );
+}
+
+function WhoSawWhat({ view }: { view: SessionView }) {
+  const rows: Array<{ who: string; step: string; state: StepState }> = [];
+  for (const m of view.members) {
+    rows.push({ who: m.name, step: "Search plan", state: m.state.steps.plan });
+    rows.push({ who: m.name, step: "Notes", state: m.state.steps.notes });
+    rows.push({ who: m.name, step: "Opinion", state: m.state.steps.opinion });
+  }
+  if (view.chair) rows.push({ who: "Chair", step: "Memo", state: view.chair.state.memo });
+  if (view.generalist) {
+    rows.push({ who: "Generalist", step: "Search plan", state: view.generalist.state.steps.plan });
+    rows.push({ who: "Generalist", step: "Memo", state: view.generalist.state.steps.memo });
+  }
+  const shown = rows.filter((r) => r.state.status === "done" && r.state.saw);
+  if (!shown.length) return null;
+  return (
+    <details className="board-card board-who">
+      <summary>
+        <h2>Who saw what</h2>
+      </summary>
+      <table>
+        <thead>
+          <tr>
+            <th>Who</th>
+            <th>Step</th>
+            <th>Was given</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((r) => (
+            <tr key={`${r.who}-${r.step}`}>
+              <td>{r.who}</td>
+              <td>{r.step}</td>
+              <td>{r.state.saw?.join(" · ") || "Nothing"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   );
 }
 
@@ -390,14 +561,19 @@ export function SessionWorkspace({ id }: { id: string }) {
     );
   }
 
-  const moves = view.members.map(nextMove);
+  const board = view.kind === "board";
+  const moves = allMoves(view);
   const runnable = moves.some((m) => m.kind === "run");
   const waiting = moves.filter((m) => m.kind === "owner").length;
-  const started = view.members.some((m) => m.state.steps.plan.status !== "idle");
+  const stopped = moves.filter((m) => m.kind === "stopped").length;
   const allDone = moves.every((m) => m.kind === "finished");
+  const started =
+    view.members.some((m) => Object.values(m.state.steps).some((s) => !["idle", "skipped"].includes(s.status))) ||
+    Boolean(view.generalist && view.generalist.state.steps.plan.status !== "idle");
+  const { done, total } = opinionCount(view);
 
-  // Any action taken by hand also lets the rest of that member's steps follow on.
-  const run = (request: StepRequest) => {
+  // Any action taken by hand also lets the steps that follow it run on.
+  const run: Run = (request) => {
     setDriving(true);
     void runStep(request);
   };
@@ -406,7 +582,7 @@ export function SessionWorkspace({ id }: { id: string }) {
     if (!window.confirm("Remove this session? Its folder is moved to the trash folder.")) return;
     try {
       await boardApi(`/api/board/sessions/${id}`, { method: "DELETE" });
-      router.push("/board/research");
+      router.push(board ? "/board" : "/board/research");
     } catch (err) {
       setError(errorText(err));
     }
@@ -416,11 +592,17 @@ export function SessionWorkspace({ id }: { id: string }) {
     <section className={`page-workspace board-workspace${view.members.length > 2 ? " is-wide" : ""}`}>
       <header className="page-workspace-header">
         <div>
-          <p className="sheet-kicker">Research trial</p>
+          <p className="sheet-kicker">
+            {board ? `Board session · ${view.speed === "fast" ? "Fast" : "Standard"}` : "Research trial"}
+          </p>
           <h1>{view.title}</h1>
           <p className="sheet-help">
-            {when(view.createdAt)} · {modelLabel(view.model)} ·{" "}
-            {view.approveSearches ? "searches wait for your approval" : "searches run without asking"}
+            {when(view.createdAt)} · {modelLabel(view.model)}
+            {board && view.speed === "fast"
+              ? " · no outside research"
+              : view.approveSearches
+                ? " · searches wait for your approval"
+                : " · searches run without asking"}
             {view.sensitive ? " · marked sensitive" : ""}
           </p>
         </div>
@@ -429,7 +611,7 @@ export function SessionWorkspace({ id }: { id: string }) {
           {!working && allDone ? <span className="board-dirty">Finished</span> : null}
           {runnable && !(driving && working) ? (
             <button type="button" className="btn btn-accent" onClick={() => setDriving(true)}>
-              {started ? "Continue" : "Run research"}
+              {started ? "Continue" : board ? "Run the board" : "Run research"}
             </button>
           ) : null}
           <button type="button" className="btn" onClick={remove}>
@@ -444,13 +626,22 @@ export function SessionWorkspace({ id }: { id: string }) {
         </p>
       ) : null}
       {waiting && !working ? (
+        <p className="board-hold">{plural(waiting, "search plan is", "search plans are")} waiting for your approval.</p>
+      ) : null}
+      {stopped && !working ? (
         <p className="board-hold">
-          {plural(waiting, "member is", "members are")} waiting for you to approve searches.
+          {plural(stopped, "step")} failed. Each one has a &quot;Try again&quot; button where it stopped.
+        </p>
+      ) : null}
+      {board && view.sealed && started ? (
+        <p className="board-sealed">
+          Opinions are sealed: {done} of {total} in. Notes and opinions open together once every member
+          has answered, so no one&apos;s view is shaped by another&apos;s.
         </p>
       ) : null}
 
       <div className="board-card">
-        <h2>Question</h2>
+        <h2>{board ? "The decision" : "Question"}</h2>
         <div className="board-prose">{view.question}</div>
         {view.material.trim() ? (
           <details className="board-page">
@@ -460,10 +651,23 @@ export function SessionWorkspace({ id }: { id: string }) {
         ) : (
           <p className="board-member-meta">No shared material was given.</p>
         )}
+        {view.standing?.trim() ? (
+          <details className="board-page">
+            <summary>Standing context ({view.standing.length.toLocaleString()} characters)</summary>
+            <pre>{view.standing}</pre>
+          </details>
+        ) : null}
         <p className="board-path">
           Folder: <code>{view.dir}</code>
         </p>
       </div>
+
+      {board ? (
+        <div className={`board-memos${view.generalist ? " is-pair" : ""}`}>
+          <ChairCard view={view} run={run} />
+          {view.generalist ? <GeneralistCard generalist={view.generalist} run={run} /> : null}
+        </div>
+      ) : null}
 
       <OverlapCard overlap={view.overlap} view={view} />
 
@@ -472,6 +676,8 @@ export function SessionWorkspace({ id }: { id: string }) {
           <MemberColumn key={member.slug} member={member} view={view} run={run} />
         ))}
       </div>
+
+      {board ? <WhoSawWhat view={view} /> : null}
     </section>
   );
 }
