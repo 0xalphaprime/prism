@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 import { interviewPrompt, MAX_INTERVIEW_QUESTIONS, parseInterview, parseLessons, parseMap } from "./compose";
-import { saveDecision } from "./decisions";
+import { saveDecision, writeHandoff } from "./decisions";
 import { interviewTurn } from "./interview";
 import { decideLesson, proposeLessons } from "./lessons";
 import { rankOwnItems, type OwnSearchFn, type ReadFn, type SearchFn } from "./research";
@@ -211,6 +211,10 @@ describe("Deep speed", () => {
     assert.ok(!memo.user.includes("FIRST-OPINION-BY-OPERATOR"), "the Chair reads the latest opinion only");
     assert.ok(memo.user.includes("[S2] About Operator second search"), "sources cited from the second round are listed");
     assert.ok(view.chair?.state.memo.saw?.includes("Revised opinion: Operator"));
+
+    const handoff = readFileSync(await writeHandoff(meta.id, root), "utf8");
+    assert.ok(handoff.includes("Against. REVISED-BY-OPERATOR"), "the hand-off quotes the revised position");
+    assert.ok(!handoff.includes("FIRST-OPINION-BY-OPERATOR"));
   });
 
   it("lets the first opinion stand, without calling a model, when the second round found nothing", async () => {

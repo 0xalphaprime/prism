@@ -4,8 +4,8 @@ import {
   listSessions,
   readChairMemo,
   readChairState,
+  readLatestOpinion,
   readSeatState,
-  readSeatText,
   requireSession,
   safeSessionId,
   sessionDir,
@@ -295,7 +295,8 @@ export async function writeHandoff(id: string, root = boardRoot(), now = Date.no
     meta.members.map(async (seat) => {
       const state = await readSeatState(id, seat.slug, root);
       // Opinions stay out of the hand-off until the Chair has reported, the same as on screen.
-      const opinion = chairDone ? await readSeatText(id, seat.slug, "opinion", root) : null;
+      // After a second round it is the revised opinion the Chair read, so that is the one quoted.
+      const opinion = chairDone ? (await readLatestOpinion(id, seat.slug, root)).text : null;
       return { name: seat.name, position: positionLine(opinion), dropped: Boolean(state.dropped) };
     }),
   );
