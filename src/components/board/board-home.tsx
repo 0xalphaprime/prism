@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { boardApi, errorText } from "@/components/board/board-api";
 import { SearchStatus } from "@/components/board/search-status";
 import { SessionIntake, SessionList } from "@/components/board/session-intake";
-import type { SessionSummary } from "@/lib/board/types";
+import type { DecisionRow, SessionSummary } from "@/lib/board/types";
 
 function StandingCard() {
   const [saved, setSaved] = useState<string | null>(null);
@@ -91,6 +91,7 @@ function StandingCard() {
 
 export function BoardHome() {
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [looseEnds, setLooseEnds] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,7 +99,10 @@ export function BoardHome() {
     const boot = async () => {
       try {
         const data = await boardApi<{ sessions: SessionSummary[] }>("/api/board/sessions");
-        if (!cancelled) setSessions(data.sessions.filter((row) => row.kind === "board"));
+        if (cancelled) return;
+        setSessions(data.sessions.filter((row) => row.kind === "board"));
+        const decided = await boardApi<{ decisions: DecisionRow[] }>("/api/board/decisions");
+        if (!cancelled) setLooseEnds(decided.decisions.filter((row) => row.looseEnd).length);
       } catch (err) {
         if (!cancelled) setError(errorText(err));
       }
@@ -133,6 +137,13 @@ export function BoardHome() {
       {error ? (
         <p className="board-error" role="alert">
           {error}
+        </p>
+      ) : null}
+
+      {looseEnds ? (
+        <p className="board-hold">
+          {looseEnds === 1 ? "1 decision is" : `${looseEnds} decisions are`} waiting on you.{" "}
+          <Link href="/board/decisions">See loose ends</Link>
         </p>
       ) : null}
 
