@@ -4262,3 +4262,126 @@ a.btn {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Board: later rounds, dossiers, lessons, interview */
+
+.board-round {
+  display: grid;
+  gap: 0.8rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.8rem;
+  min-width: 0;
+}
+
+.board-round-head {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.board-own {
+  display: block;
+  font-size: 0.76rem;
+  color: var(--accent);
+  line-height: 1.35;
+}
+
+.board-query .board-own {
+  display: inline;
+}
+
+.board-points,
+.board-lessons,
+.board-interview-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.board-points li {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.board-points p {
+  margin: 0;
+}
+
+.board-lesson {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-node);
+  padding: 0.6rem 0.7rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.board-lesson p {
+  margin: 0;
+}
+
+.board-lesson.is-approved {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+}
+
+.board-lesson.is-rejected p {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+}
+
+.board-dossiers {
+  margin-bottom: 0.85rem;
+}
+
+.board-dossiers .sheet-help {
+  margin: 0.5rem 0 0.7rem;
+}
+
+.board-interview {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+
+.board-interview-log li {
+  display: grid;
+  gap: 0.15rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.board-interview-log li span {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.board-interview-log li.is-owner {
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line);
+  color: var(--ink-soft);
+}
+
+.board-interview-draft {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.board-rounds-pick {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+}
+
+.board-rounds-pick .board-member-meta {
+  margin: 0;
+}
