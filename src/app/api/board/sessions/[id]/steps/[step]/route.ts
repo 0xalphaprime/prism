@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { syncHandoff } from "@/lib/board/decisions";
 import { boardErrorResponse, readJsonBody } from "@/lib/board/http";
 import { liveDeps } from "@/lib/board/server";
 import {
@@ -83,6 +84,8 @@ export async function POST(request: Request, ctx: Ctx) {
       default:
         return NextResponse.json({ error: "Unknown step" }, { status: 404 });
     }
+    // The hand-off file quotes the memo and the positions, so it follows every change to them.
+    await syncHandoff(id).catch((error) => console.error("Board hand-off was not written", error));
     return NextResponse.json({ ...outcome, session: await readSessionView(id) });
   } catch (error) {
     return boardErrorResponse(error);
