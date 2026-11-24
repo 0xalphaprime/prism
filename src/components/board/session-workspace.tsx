@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { boardApi, errorText } from "@/components/board/board-api";
 import { DecisionCard } from "@/components/board/decision-card";
 import { Prose } from "@/components/board/prose";
+import { SPEED_LABEL } from "@/components/board/session-intake";
+import { SawList, StepChip, StepError, plural, seconds, when } from "@/components/board/session-parts";
+import { DossierNote, LessonsSection, OpenPoints, WrittenStep } from "@/components/board/session-rounds";
 import {
   allMoves,
+  chairMove,
   opinionCount,
   useSession,
   type StepRequest,
@@ -26,75 +30,6 @@ import type {
 
 type Run = (request: StepRequest) => void;
 
-const STATUS_LABEL: Record<StepState["status"], string> = {
-  idle: "Not started",
-  running: "Working",
-  done: "Done",
-  error: "Failed",
-  skipped: "Skipped",
-};
-
-function when(ms?: number) {
-  return ms ? new Date(ms).toLocaleString() : "";
-}
-
-function seconds(from?: number, to?: number) {
-  if (!from || !to || to < from) return "";
-  return `${((to - from) / 1000).toFixed(1)}s`;
-}
-
-function plural(n: number, one: string, many = `${one}s`) {
-  return `${n.toLocaleString()} ${n === 1 ? one : many}`;
-}
-
-export function StepChip({ label, state }: { label: string; state: StepState }) {
-  return (
-    <span className={`board-step is-${state.status}`} title={state.error ?? STATUS_LABEL[state.status]}>
-      {label}
-      <em>{STATUS_LABEL[state.status]}</em>
-    </span>
-  );
-}
-
-export function SawList({ state }: { state: StepState }) {
-  if (!state.saw?.length) return null;
-  return (
-    <details className="board-saw">
-      <summary>
-        What was put in front of the model{state.model ? ` (${modelLabel(state.model)})` : ""}
-      </summary>
-      <ul>
-        {state.saw.map((item) => (
-          <li key={item}>{item}</li>
-        ))}
-      </ul>
-    </details>
-  );
-}
-
-function StepError({
-  state,
-  onRetry,
-  children,
-}: {
-  state: StepState;
-  onRetry: () => void;
-  children?: ReactNode;
-}) {
-  if (state.status !== "error") return null;
-  return (
-    <div className="board-error" role="alert">
-      <p>{state.error || "This step failed."}</p>
-      <div className="board-actions">
-        <button type="button" className="btn" onClick={onRetry}>
-          Try again
-        </button>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 function PlanSection({
   plan,
   planStep,
@@ -103,11 +38,17 @@ function PlanSection({
   onRetry,
   onApprove,
   onSkip,
+  title = "Search plan",
+  skipLabel = "Skip research",
+  idleText = "Not written yet.",
 }: {
   plan: MemberPlan | null;
   planStep: StepState;
   researchStep: StepState;
   limit: number;
+  title?: string;
+  skipLabel?: string;
+  idleText?: string;
   onRetry: () => void;
   onApprove: (queries: PlannedQuery[]) => void;
   onSkip: () => void;
@@ -121,8 +62,8 @@ function PlanSection({
   if (planStep.status === "skipped") return null;
   return (
     <section className="board-section">
-      <h3>Search plan</h3>
-      {planStep.status === "idle" ? <p className="sheet-help">Not written yet.</p> : null}
+      <h3>{title}</h3>
+      {planStep.status === "idle" ? <p className="sheet-help">{idleText}</p> : null}
       {planStep.status === "running" ? <p className="sheet-help">Deciding what to look for…</p> : null}
       <StepError state={planStep} onRetry={onRetry} />
 
@@ -155,6 +96,7 @@ function PlanSection({
                 ) : (
                   <span className="board-query">{q.query}</span>
                 )}
+                {q.where === "own" ? <span className="board-own">Searches your own records, not the web</span> : null}
                 {q.why ? <span className="board-why">{q.why}</span> : null}
                 {flaggedFor(q.query).length ? (
                   <span className="board-flag">Repeats from your material: {flaggedFor(q.query).join(", ")}</span>
@@ -173,7 +115,7 @@ function PlanSection({
                 </button>
               ) : null}
               <button type="button" className="btn" onClick={onSkip}>
-                Skip research
+                {skipLabel}
               </button>
             </div>
           ) : null}
@@ -201,6 +143,7 @@ export function ResearchTrail({ record }: { record: ResearchRecord }) {
           <p className="board-query">
             {i + 1}. {q.query}
             <span className="board-member-meta"> {seconds(q.startedAt, q.finishedAt)}</span>
+            {q.where === "own" ? <span className="board-own"> Your own records</span> : null}
           </p>
           {q.error ? <p className="board-flag">Search failed: {q.error}</p> : null}
           {!q.error && q.hits.length === 0 ? <p className="board-member-meta">No results.</p> : null}
@@ -245,11 +188,15 @@ function ResearchSection({
   record,
   onRetry,
   onSkip,
+  title = "Research trail",
+  skipLabel = "Continue without research",
 }: {
   step: StepState;
   record: ResearchRecord | null;
   onRetry: () => void;
   onSkip: () => void;
+  title?: string;
+  skipLabel?: string;
 }) {
   if (step.status === "skipped" && !record) {
     return (
@@ -261,12 +208,12 @@ function ResearchSection({
   }
   return (
     <section className="board-section">
-      <h3>Research trail</h3>
+      <h3>{title}</h3>
       {step.status === "idle" ? <p className="sheet-help">Nothing searched yet.</p> : null}
       {step.status === "running" ? <p className="sheet-help">Searching and reading…</p> : null}
       <StepError state={step} onRetry={onRetry}>
         <button type="button" className="btn" onClick={onSkip}>
-          Continue without research
+          {skipLabel}
         </button>
       </StepError>
       {record && step.status !== "running" ? <ResearchTrail record={record} /> : null}
@@ -298,6 +245,7 @@ function NotesSection({ member, sealed, run }: { member: SessionMemberView; seal
 
 function OpinionSection({ member, sealed, run }: { member: SessionMemberView; sealed: boolean; run: Run }) {
   const step = member.state.steps.opinion;
+  const revisedStep = member.state.steps.revised;
   return (
     <section className="board-section board-opinion">
       <h3>Opinion</h3>
@@ -311,13 +259,67 @@ function OpinionSection({ member, sealed, run }: { member: SessionMemberView; se
       {step.status === "done" && sealed ? (
         <p className="board-sealed">Opinion is in. Sealed until every member has answered.</p>
       ) : null}
-      {member.opinion && step.status === "done" ? (
+      {member.opinion && step.status === "done" && !member.revised ? (
         <>
+          {revisedStep.status === "done" ? (
+            <p className="board-member-meta">
+              The second round of research turned up nothing new to read, so this first opinion stands.
+            </p>
+          ) : null}
           <Prose text={member.opinion} />
           <SawList state={step} />
         </>
       ) : null}
+      {member.opinion && member.revised && step.status === "done" ? (
+        <>
+          <p className="board-member-meta">Revised after the second round of research. This is the one the Chair reads.</p>
+          <Prose text={member.revised} />
+          <SawList state={revisedStep} />
+          <details className="board-page">
+            <summary>First opinion, before the second round</summary>
+            <Prose text={member.opinion} />
+            <SawList state={step} />
+          </details>
+        </>
+      ) : null}
     </section>
+  );
+}
+
+/** The Deep speed's second round: a search plan aimed at the open points, then more research. */
+function SecondRound({ member, view, run }: { member: SessionMemberView; view: SessionView; run: Run }) {
+  const { plan2, research2, revised } = member.state.steps;
+  if (plan2.status === "skipped") return null;
+  const slug = member.slug;
+  const skip = () => run({ step: "research2", member: slug, body: { approve: true, queries: [], force: true } });
+  return (
+    <div className="board-round" data-round="second">
+      <p className="board-round-head">Second round</p>
+      <PlanSection
+        title="Second search plan"
+        skipLabel="Skip the second round"
+        idleText="Written once the Chair has listed what the members disagree on."
+        plan={member.plan2}
+        planStep={plan2}
+        researchStep={research2}
+        limit={view.limits.searches}
+        onRetry={() => run({ step: "plan2", member: slug })}
+        onApprove={(queries) => run({ step: "research2", member: slug, body: { approve: true, queries } })}
+        onSkip={skip}
+      />
+      {plan2.status === "done" ? (
+        <ResearchSection
+          title="Second research trail"
+          skipLabel="Continue without a second round"
+          step={research2}
+          record={member.research2}
+          onRetry={() => run({ step: "research2", member: slug })}
+          onSkip={skip}
+        />
+      ) : null}
+      {revised.status === "running" ? <p className="sheet-help">Revising the opinion…</p> : null}
+      <StepError state={revised} onRetry={() => run({ step: "revised", member: slug })} />
+    </div>
   );
 }
 
@@ -351,7 +353,17 @@ export function OverlapCard({ overlap, view }: { overlap: OverlapReport; view: S
   );
 }
 
-function MemberColumn({ member, view, run }: { member: SessionMemberView; view: SessionView; run: Run }) {
+function MemberColumn({
+  member,
+  view,
+  run,
+  onChange,
+}: {
+  member: SessionMemberView;
+  view: SessionView;
+  run: Run;
+  onChange: (next: SessionView) => void;
+}) {
   const steps = member.state.steps;
   const board = view.kind === "board";
   const slug = member.slug;
@@ -361,7 +373,16 @@ function MemberColumn({ member, view, run }: { member: SessionMemberView; view: 
     ["Notes", steps.notes],
   ];
   if (board) chips.push(["Opinion", steps.opinion]);
+  const later: Array<[string, StepState]> = [
+    ["Second plan", steps.plan2],
+    ["Second research", steps.research2],
+    ["Revised opinion", steps.revised],
+    ["Premortem", steps.premortem],
+    ["Cross-examination", steps.cross],
+  ];
+  for (const [label, state] of later) if (state.status !== "skipped") chips.push([label, state]);
   const dropped = Boolean(member.state.dropped);
+  const chairDone = view.chair?.state.memo.status === "done";
 
   return (
     <article className={`board-seat${dropped ? " is-dropped" : ""}`} data-member={slug}>
@@ -389,7 +410,29 @@ function MemberColumn({ member, view, run }: { member: SessionMemberView; view: 
           <StepChip key={label} label={label} state={state} />
         ))}
       </div>
+      {member.dossier ? <DossierNote text={member.dossier} /> : null}
       {board ? <OpinionSection member={member} sealed={view.sealed} run={run} /> : null}
+      {board ? (
+        <WrittenStep
+          title="Premortem"
+          state={steps.premortem}
+          text={member.premortem}
+          idleText="Written once this member's opinion is final: suppose the advice was followed and it failed."
+          busyText="Imagining how this fails…"
+          onRetry={() => run({ step: "premortem", member: slug })}
+        />
+      ) : null}
+      {board ? (
+        <WrittenStep
+          title="Cross-examination"
+          state={steps.cross}
+          text={member.cross}
+          idleText="Starts once every opinion is final. This is the only time a member reads the others' opinions."
+          busyText="Reading the other opinions…"
+          onRetry={() => run({ step: "cross", member: slug })}
+        />
+      ) : null}
+      {board && chairDone && !dropped ? <LessonsSection id={view.id} member={member} run={run} onChange={onChange} /> : null}
       <PlanSection
         plan={member.plan}
         planStep={steps.plan}
@@ -406,6 +449,7 @@ function MemberColumn({ member, view, run }: { member: SessionMemberView; view: 
         onSkip={() => run({ step: "skip-research", member: slug })}
       />
       <NotesSection member={member} sealed={view.sealed} run={run} />
+      {board ? <SecondRound member={member} view={view} run={run} /> : null}
       {steps.plan.status === "done" && !dropped ? (
         <div className="board-actions board-seat-foot">
           <button type="button" className="btn" onClick={() => run({ step: "plan", member: slug })}>
@@ -419,8 +463,9 @@ function MemberColumn({ member, view, run }: { member: SessionMemberView; view: 
 
 function ChairCard({ view, run }: { view: SessionView; run: Run }) {
   if (!view.chair) return null;
-  const memo = view.chair.state.memo;
+  const { memo, map } = view.chair.state;
   const { done, total } = opinionCount(view);
+  const next = chairMove(view);
   return (
     <article className="board-memo" data-seat="chair">
       <header className="board-seat-head">
@@ -430,13 +475,20 @@ function ChairCard({ view, run }: { view: SessionView; run: Run }) {
             Reads every opinion and the sources they cite. Does not read the members&apos; notes.
           </p>
         </div>
-        <StepChip label="Memo" state={memo} />
+        <div className="board-steps">
+          {map.status !== "skipped" ? <StepChip label="Open points" state={map} /> : null}
+          <StepChip label="Memo" state={memo} />
+        </div>
       </header>
-      {memo.status === "idle" ? (
+      {memo.status === "idle" && done < total ? (
         <p className="sheet-help">
           Written once every opinion is in ({done} of {total} so far).
         </p>
       ) : null}
+      {memo.status === "idle" && done === total && next.kind === "waiting" ? (
+        <p className="sheet-help">Written after the later rounds: {next.reason.toLowerCase()}.</p>
+      ) : null}
+      <OpenPoints view={view} onRetry={() => run({ step: "map" })} />
       {memo.status === "running" ? <p className="sheet-help">Reading the opinions…</p> : null}
       <StepError state={memo} onRetry={() => run({ step: "chair" })} />
       {view.chair.memo && memo.status === "done" ? (
@@ -509,13 +561,21 @@ function WhoSawWhat({ view }: { view: SessionView }) {
     rows.push({ who: m.name, step: "Search plan", state: m.state.steps.plan });
     rows.push({ who: m.name, step: "Notes", state: m.state.steps.notes });
     rows.push({ who: m.name, step: "Opinion", state: m.state.steps.opinion });
+    rows.push({ who: m.name, step: "Second search plan", state: m.state.steps.plan2 });
+    rows.push({ who: m.name, step: "Revised opinion", state: m.state.steps.revised });
+    rows.push({ who: m.name, step: "Premortem", state: m.state.steps.premortem });
+    rows.push({ who: m.name, step: "Cross-examination", state: m.state.steps.cross });
+    if (m.lessons) rows.push({ who: m.name, step: "Lessons", state: m.lessons.state });
   }
-  if (view.chair) rows.push({ who: "Chair", step: "Memo", state: view.chair.state.memo });
+  if (view.chair) {
+    rows.push({ who: "Chair", step: "Open points", state: view.chair.state.map });
+    rows.push({ who: "Chair", step: "Memo", state: view.chair.state.memo });
+  }
   if (view.generalist) {
     rows.push({ who: "Generalist", step: "Search plan", state: view.generalist.state.steps.plan });
     rows.push({ who: "Generalist", step: "Memo", state: view.generalist.state.steps.memo });
   }
-  const shown = rows.filter((r) => r.state.status === "done" && r.state.saw);
+  const shown = rows.filter((r) => r.state.status === "done" && r.state.saw?.length);
   if (!shown.length) return null;
   return (
     <details className="board-card board-who">
@@ -546,7 +606,7 @@ function WhoSawWhat({ view }: { view: SessionView }) {
 
 export function SessionWorkspace({ id }: { id: string }) {
   const router = useRouter();
-  const { view, error, setError, runStep, driving, setDriving, working } = useSession(id);
+  const { view, error, setError, runStep, apply, driving, setDriving, working } = useSession(id);
 
   if (!view) {
     return (
@@ -594,7 +654,7 @@ export function SessionWorkspace({ id }: { id: string }) {
       <header className="page-workspace-header">
         <div>
           <p className="sheet-kicker">
-            {board ? `Board session · ${view.speed === "fast" ? "Fast" : "Standard"}` : "Research trial"}
+            {board ? `Board session · ${SPEED_LABEL[view.speed ?? "standard"]}` : "Research trial"}
           </p>
           <h1>{view.title}</h1>
           <p className="sheet-help">
@@ -605,6 +665,8 @@ export function SessionWorkspace({ id }: { id: string }) {
                 ? " · searches wait for your approval"
                 : " · searches run without asking"}
             {view.sensitive ? " · marked sensitive" : ""}
+            {view.rounds?.premortem ? " · premortem" : ""}
+            {view.rounds?.crossExam ? " · cross-examination" : ""}
           </p>
         </div>
         <div className="board-actions">
@@ -675,7 +737,7 @@ export function SessionWorkspace({ id }: { id: string }) {
 
       <div className="board-seats">
         {view.members.map((member) => (
-          <MemberColumn key={member.slug} member={member} view={view} run={run} />
+          <MemberColumn key={member.slug} member={member} view={view} run={run} onChange={apply} />
         ))}
       </div>
 

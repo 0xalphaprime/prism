@@ -1,5 +1,6 @@
 import type {
   OverlapReport,
+  OwnSource,
   PageRecord,
   PlannedQuery,
   QueryRecord,
@@ -18,6 +19,23 @@ import type {
 export type SearchFn = (query: string, opts: { limit: number }) => Promise<SearchHit[]>;
 
 export type ReadFn = (url: string) => Promise<{ text: string; title?: string; via: string }>;
+
+export type OwnHit = { source: OwnSource; title: string; url?: string; text: string };
+
+/**
+ * Searches the owner's own records. `problems` says, per source, why nothing
+ * could be searched there (for example, not connected).
+ */
+export type OwnSearchFn = (
+  query: string,
+  opts: { sources: OwnSource[]; limit: number },
+) => Promise<{ hits: OwnHit[]; problems: string[] }>;
+
+export const OWN_SOURCE_NAMES: Record<OwnSource, string> = {
+  knowledge: "knowledge cards",
+  airtable: "Airtable records",
+  github: "GitHub repositories",
+};
 
 export const DEFAULT_LIMITS: ResearchLimits = {
   searches: 4,
@@ -107,8 +125,12 @@ function cleanQuery(raw: unknown): string {
     .trim();
 }
 
-/** Trims, drops blanks and repeats, and cuts the list to `max`. */
-export function cleanQueries(raw: unknown, max: number): PlannedQuery[] {
+/**
+ * Trims, drops blanks and repeats, and cuts the list to `max`. A search marked
+ * for the owner's own records keeps that mark only when `allowOwn` is set;
+ * otherwise it is treated as a web search like any other.
+ */
+export function cleanQueries(raw: unknown, max: number, opts: { allowOwn?: boolean } = {}): PlannedQuery[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
   const out: PlannedQuery[] = [];
@@ -124,7 +146,9 @@ export function cleanQueries(raw: unknown, max: number): PlannedQuery[] {
       item && typeof item === "object" && typeof (item as { why?: unknown }).why === "string"
         ? (item as { why: string }).why.replace(/\s+/g, " ").trim().slice(0, 300)
         : "";
-    out.push({ query, why });
+    const own =
+      Boolean(opts.allowOwn) && item && typeof item === "object" && (item as { where?: unknown }).where === "own";
+    out.push(own ? { query, why, where: "own" } : { query, why });
     if (out.length >= max) break;
   }
   return out;
@@ -150,14 +174,14 @@ function jsonCandidates(text: string): string[] {
  * Reads a member's search plan out of a model reply. Accepts the asked-for
  * JSON, JSON inside a code fence or surrounded by prose, or a plain list.
  */
-export function parsePlan(text: string, max: number): PlannedQuery[] {
+export function parsePlan(text: string, max: number, opts: { allowOwn?: boolean } = {}): PlannedQuery[] {
   for (const candidate of jsonCandidates(text)) {
     try {
       const parsed = JSON.parse(candidate.trim()) as unknown;
       const list = Array.isArray(parsed)
         ? parsed
         : (parsed as { queries?: unknown } | null)?.queries;
-      if (Array.isArray(list)) return cleanQueries(list, max);
+      if (Array.isArray(list)) return cleanQueries(list, max, opts);
     } catch {
       // try the next shape
     }
@@ -250,7 +274,9 @@ export function flagQueries(
 ): Array<{ query: string; terms: string[] }> {
   const terms = identifyingTerms(material);
   const flagged: Array<{ query: string; terms: string[] }> = [];
-  for (const { query } of queries) {
+  for (const { query, where } of queries) {
+    // Searches of the owner's own records do not go to the public web.
+    if (where === "own") continue;
     const plain = query.toLowerCase().replace(/,/g, "");
     const found = terms.filter((term) =>
       new RegExp(`(^|[^a-z0-9])${escapeRegExp(term)}($|[^a-z0-9])`, "i").test(plain),
@@ -282,10 +308,18 @@ export async function runResearch(args: {
   search: SearchFn;
   read: ReadFn;
   now?: () => number;
+  /** A second round: source ids carry on after these, and these pages are not read twice. */
+  earlier?: ResearchRecord | null;
+  /** Searches the owner's own records, for queries marked `own`. */
+  own?: OwnSearchFn;
+  sources?: OwnSource[];
 }): Promise<ResearchRecord> {
   const now = args.now ?? Date.now;
   const limits = args.limits;
   const startedAt = now();
+  const earlier = args.earlier?.pages ?? [];
+  const before = new Set(earlier.filter((p) => !p.error && p.text).map((p) => normalizeUrl(p.url)));
+  const idBase = earlier.length;
   const seen = new Set<string>();
   const queries: QueryRecord[] = [];
   const pages: PageRecord[] = [];
@@ -298,6 +332,47 @@ export async function runResearch(args: {
       finishedAt: 0,
       hits: [],
     };
+    if (planned.where === "own") {
+      record.where = "own";
+      const sources = args.sources ?? [];
+      try {
+        if (!args.own || !sources.length) throw new Error("This member has no own records to search");
+        const found = await args.own(planned.query, { sources, limit: limits.pagesPerSearch });
+        if (found.problems.length) record.error = found.problems.join(" ");
+        for (const hit of found.hits.slice(0, limits.pagesPerSearch)) {
+          const full = tidyText(hit.text ?? "");
+          const title = (hit.title ?? "").trim() || "Untitled";
+          const url = (hit.url ?? "").trim() || `own:${hit.source}/${encodeURIComponent(title)}`;
+          const key = normalizeUrl(url);
+          const entry: QueryRecord["hits"][number] = { url, title, description: full.slice(0, 400), read: false };
+          if (!full) entry.skipped = "Nothing to read in this record";
+          else if (seen.has(key) || before.has(key)) entry.skipped = "Already read";
+          else {
+            seen.add(key);
+            entry.read = true;
+            const text = full.slice(0, limits.pageChars);
+            pages.push({
+              id: `S${idBase + pages.length + 1}`,
+              url,
+              title,
+              query: planned.query,
+              via: `own records: ${OWN_SOURCE_NAMES[hit.source] ?? hit.source}`,
+              fetchedAt: now(),
+              chars: text.length,
+              truncated: full.length > text.length,
+              text,
+            });
+          }
+          record.hits.push(entry);
+        }
+      } catch (error) {
+        record.error = errorMessage(error);
+      }
+      record.finishedAt = now();
+      queries.push(record);
+      continue;
+    }
+
     let hits: SearchHit[] = [];
     try {
       hits = await args.search(planned.query, { limit: limits.pagesPerSearch + 3 });
@@ -316,12 +391,13 @@ export async function runResearch(args: {
       };
       const key = normalizeUrl(url);
       if (!isPublicHttpUrl(url)) entry.skipped = "Not a public web address";
+      else if (before.has(key)) entry.skipped = "Already read in the first round";
       else if (seen.has(key)) entry.skipped = "Already read for an earlier search";
       else if (picks.length >= limits.pagesPerSearch) entry.skipped = "Over the page limit";
       else {
         seen.add(key);
         entry.read = true;
-        picks.push({ id: `S${pages.length + picks.length + 1}`, hit: { ...entry } });
+        picks.push({ id: `S${idBase + pages.length + picks.length + 1}`, hit: { ...entry } });
       }
       record.hits.push(entry);
     }
@@ -410,4 +486,47 @@ export function overlapReport(
     figure: distinct ? shared.length / distinct : 0,
     pairs,
   };
+}
+
+/* ---------- The owner's own records ---------- */
+
+const STOP_WORDS = new Set(
+  "a an and are as at be by for from has have how in is it its of on or our that the their this to was we what when where which who why will with".split(
+    " ",
+  ),
+);
+
+function keywords(query: string) {
+  return [
+    ...new Set(
+      query
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length > 2 && !STOP_WORDS.has(word)),
+    ),
+  ];
+}
+
+/**
+ * Picks the records that best match a search, by how many of its words they
+ * contain (a word in the title counts double). Records matching none are left out.
+ */
+export function rankOwnItems<T extends { title: string; text: string }>(items: T[], query: string, limit: number): T[] {
+  const words = keywords(query);
+  if (!words.length) return [];
+  return items
+    .map((item, index) => {
+      const title = item.title.toLowerCase();
+      const body = item.text.toLowerCase();
+      let score = 0;
+      for (const word of words) {
+        if (title.includes(word)) score += 2;
+        else if (body.includes(word)) score += 1;
+      }
+      return { item, index, score };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, Math.max(0, limit))
+    .map((row) => row.item);
 }

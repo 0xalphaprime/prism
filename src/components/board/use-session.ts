@@ -24,6 +24,55 @@ function anyRunningIn(steps: Record<string, StepState>) {
   return Object.values(steps).some((s) => s.status === "running");
 }
 
+/** A step the session does not run is saved as skipped. */
+function on(state: StepState) {
+  return state.status !== "skipped";
+}
+
+/** True once a member's opinion is final: given, and revised if the session has a second round. */
+export function opinionSettled(member: SessionMemberView) {
+  const { opinion, revised } = member.state.steps;
+  return opinion.status === "done" && (!on(revised) || revised.status === "done");
+}
+
+/** The steps after the blind round, for a member whose first opinion is in. */
+function laterMove(member: SessionMemberView, view: SessionView, run: (step: string) => NextMove): NextMove {
+  const { plan2, research2, revised, premortem, cross } = member.state.steps;
+
+  if (on(plan2)) {
+    const map = view.chair?.state.map;
+    if (plan2.status === "error") return { kind: "stopped", reason: "The second search plan failed" };
+    if (plan2.status === "idle") {
+      if (map?.status !== "done") return { kind: "waiting", reason: "Waiting for the Chair's list of open points" };
+      return run("plan2");
+    }
+    if (research2.status === "error") return { kind: "stopped", reason: "The second round of research failed" };
+    if (research2.status === "idle") {
+      if (!member.plan2?.approved) return { kind: "owner", reason: "Second-round searches are waiting for your approval" };
+      return run("research2");
+    }
+    if (revised.status === "error") return { kind: "stopped", reason: "The revised opinion failed" };
+    if (revised.status === "idle") return run("revised");
+  }
+
+  if (on(premortem)) {
+    if (premortem.status === "error") return { kind: "stopped", reason: "The premortem failed" };
+    if (premortem.status === "idle") return run("premortem");
+  }
+
+  if (on(cross)) {
+    if (cross.status === "error") return { kind: "stopped", reason: "The cross-examination failed" };
+    if (cross.status === "idle") {
+      const others = view.members.filter((m) => !m.state.dropped);
+      if (!others.every(opinionSettled)) {
+        return { kind: "waiting", reason: "Cross-examination starts once every opinion is final" };
+      }
+      return run("cross");
+    }
+  }
+  return { kind: "finished" };
+}
+
 /** What should happen next for one member, read off the saved state. */
 export function memberMove(member: SessionMemberView, view: SessionView): NextMove {
   const { plan, research, notes, opinion } = member.state.steps;
@@ -46,6 +95,7 @@ export function memberMove(member: SessionMemberView, view: SessionView): NextMo
   if (view.kind === "board") {
     if (opinion.status === "error") return { kind: "stopped", reason: "The opinion failed" };
     if (opinion.status === "idle") return run("opinion");
+    return laterMove(member, view, run);
   }
   return { kind: "finished" };
 }
@@ -60,13 +110,21 @@ export function opinionCount(view: SessionView) {
 
 export function chairMove(view: SessionView): NextMove {
   if (!view.chair) return { kind: "finished" };
-  const memo = view.chair.state.memo;
-  if (memo.status === "running") return { kind: "busy" };
+  const { map, memo } = view.chair.state;
+  if (memo.status === "running" || map.status === "running") return { kind: "busy" };
   if (memo.status === "done") return { kind: "finished" };
   if (memo.status === "error") return { kind: "stopped", reason: "The Chair's memo failed" };
   const { done, total } = opinionCount(view);
-  if (total > 0 && done === total) return { kind: "run", request: { step: "chair" } };
-  return { kind: "waiting", reason: `${done} of ${total} opinions in` };
+  if (total === 0 || done < total) return { kind: "waiting", reason: `${done} of ${total} opinions in` };
+  if (on(map)) {
+    if (map.status === "error") return { kind: "stopped", reason: "The Chair's list of open points failed" };
+    if (map.status === "idle") return { kind: "run", request: { step: "map" } };
+  }
+  // The memo waits for every member to finish whatever later rounds this session runs.
+  const active = view.members.filter((m) => !m.state.dropped);
+  const left = active.filter((m) => memberMove(m, view).kind !== "finished").length;
+  if (left) return { kind: "waiting", reason: `${left} of ${active.length} members still in the later rounds` };
+  return { kind: "run", request: { step: "chair" } };
 }
 
 export function generalistMove(view: SessionView): NextMove {
@@ -99,6 +157,8 @@ function anyRunning(view: SessionView | null) {
   return (
     view.members.some((m) => anyRunningIn(m.state.steps)) ||
     view.chair?.state.memo.status === "running" ||
+    view.chair?.state.map.status === "running" ||
+    view.members.some((m) => m.lessons?.state.status === "running") ||
     Boolean(view.generalist && anyRunningIn(view.generalist.state.steps))
   );
 }
@@ -199,6 +259,7 @@ export function useSession(id: string) {
     error,
     setError,
     refresh,
+    apply,
     runStep,
     driving,
     setDriving,

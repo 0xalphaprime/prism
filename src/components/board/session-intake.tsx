@@ -12,7 +12,7 @@ import type { MemberSummary, SessionKind, SessionSpeed, SessionSummary } from "@
 
 const MODEL_KEY = "prism.board.model";
 
-function loadBoardModel(): string {
+export function loadBoardModel(): string {
   try {
     const saved = window.localStorage.getItem(MODEL_KEY);
     if (saved) return saved;
@@ -22,13 +22,15 @@ function loadBoardModel(): string {
   return defaultModelForProvider(loadProviderPrefs().defaultProvider);
 }
 
-function saveBoardModel(model: string) {
+export function saveBoardModel(model: string) {
   try {
     window.localStorage.setItem(MODEL_KEY, model);
   } catch {
     // not being able to remember the choice is harmless
   }
 }
+
+export const SPEED_LABEL: Record<SessionSpeed, string> = { fast: "Fast", standard: "Standard", deep: "Deep" };
 
 export function SessionList({
   sessions,
@@ -48,7 +50,7 @@ export function SessionList({
             <span className="board-member-title">{s.members.join(", ")}</span>
             <span className="board-member-meta">
               {new Date(s.createdAt).toLocaleString()}
-              {s.kind === "board" ? ` · ${s.speed === "fast" ? "Fast" : "Standard"}` : ""}
+              {s.kind === "board" ? ` · ${SPEED_LABEL[s.speed ?? "standard"]}` : ""}
               {s.finished ? " · finished" : " · not finished"}
               {s.sensitive ? " · sensitive" : ""}
             </span>
@@ -70,6 +72,9 @@ export function SessionIntake({ kind }: { kind: SessionKind }) {
   const [model, setModel] = useState("");
   const [speed, setSpeed] = useState<SessionSpeed>("standard");
   const [generalist, setGeneralist] = useState(false);
+  const [crossExam, setCrossExam] = useState(false);
+  const [premortem, setPremortem] = useState(false);
+  const [dossiers, setDossiers] = useState<Record<string, string>>({});
   const [searches, setSearches] = useState(DEFAULT_LIMITS.searches);
   const [pages, setPages] = useState(DEFAULT_LIMITS.pagesPerSearch);
   const [approve, setApprove] = useState(false);
@@ -120,6 +125,10 @@ export function SessionIntake({ kind }: { kind: SessionKind }) {
           model,
           members: picked,
           speed: board ? speed : undefined,
+          rounds: board ? { crossExam: crossExam && picked.length > 1, premortem } : undefined,
+          dossiers: board
+            ? Object.fromEntries(Object.entries(dossiers).filter(([slug, text]) => picked.includes(slug) && text.trim()))
+            : undefined,
           withGeneralist: board ? generalist : undefined,
           sensitive,
           approveSearches: approve || sensitive,
@@ -188,6 +197,16 @@ export function SessionIntake({ kind }: { kind: SessionKind }) {
                 <em>No outside research. One or two members give an opinion from the material alone.</em>
               </span>
             </label>
+            <label className={`board-pick${speed === "deep" ? " is-on" : ""}`}>
+              <input type="radio" name="speed" checked={speed === "deep"} onChange={() => setSpeed("deep")} />
+              <span>
+                <strong>Deep</strong>
+                <em>
+                  Standard, then the Chair lists what the members disagree on and each researches again,
+                  aimed at those points, before the memo. About twice the time and cost.
+                </em>
+              </span>
+            </label>
           </div>
         </div>
       ) : null}
@@ -245,6 +264,51 @@ export function SessionIntake({ kind }: { kind: SessionKind }) {
           </>
         )}
       </div>
+
+      {board && picked.length ? (
+        <details className="board-page board-dossiers" data-section="dossiers">
+          <summary>
+            Private dossiers (optional)
+            {Object.entries(dossiers).some(([slug, text]) => picked.includes(slug) && text.trim()) ? " · in use" : ""}
+          </summary>
+          <p className="sheet-help">
+            Leave these empty unless you mean to give one member something the others do not have.
+            The point of the board is that everyone reads the same material. The generalist, if you
+            run one, is given every dossier.
+          </p>
+          {members
+            ?.filter((m) => picked.includes(m.slug))
+            .map((m) => (
+              <label key={m.slug} className="field">
+                <span>For {m.name} only</span>
+                <textarea
+                  className="board-textarea board-textarea-short"
+                  value={dossiers[m.slug] ?? ""}
+                  onChange={(e) => setDossiers((all) => ({ ...all, [m.slug]: e.target.value }))}
+                />
+              </label>
+            ))}
+        </details>
+      ) : null}
+
+      {board ? (
+        <div className="board-rounds-pick" data-section="rounds">
+          <p className="board-member-meta">Extra rounds, after every opinion is in</p>
+          <label className="field-checkbox">
+            <input type="checkbox" checked={premortem} onChange={(e) => setPremortem(e.target.checked)} />
+            <span>Premortem: each member assumes their advice was followed and failed, and says why</span>
+          </label>
+          <label className="field-checkbox">
+            <input
+              type="checkbox"
+              checked={crossExam && picked.length > 1}
+              disabled={picked.length < 2}
+              onChange={(e) => setCrossExam(e.target.checked)}
+            />
+            <span>Cross-examination: each member reads the others&apos; opinions and answers them</span>
+          </label>
+        </div>
+      ) : null}
 
       {board ? (
         <label className="field-checkbox">

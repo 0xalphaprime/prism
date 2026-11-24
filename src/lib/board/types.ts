@@ -3,6 +3,11 @@
  * personality and research directives.
  */
 
+/** The owner's own records a member may be allowed to search. */
+export type OwnSource = "knowledge" | "airtable" | "github";
+
+export const OWN_SOURCES: OwnSource[] = ["knowledge", "airtable", "github"];
+
 /** Stored as `member.json` in the member's folder. */
 export type MemberMeta = {
   slug: string;
@@ -11,6 +16,8 @@ export type MemberMeta = {
   title: string;
   /** Optional model override. Empty means "use the session's model". */
   model?: string;
+  /** Own records this member may search as well as the web. Empty means web only. */
+  sources?: OwnSource[];
   createdAt: number;
   updatedAt: number;
 };
@@ -42,6 +49,7 @@ export type MemberDraft = {
   profile: string;
   directives: string;
   model?: string;
+  sources?: OwnSource[];
   files?: Array<{ name: string; content: string }>;
 };
 
@@ -70,6 +78,8 @@ export type StepState = {
 export type PlannedQuery = {
   query: string;
   why: string;
+  /** `own` searches the owner's own records and never goes to the public web. */
+  where?: "own";
 };
 
 /** `plan.json`: the searches a member wants to run. */
@@ -93,6 +103,7 @@ export type SearchHit = {
 export type QueryRecord = {
   query: string;
   why: string;
+  where?: "own";
   startedAt: number;
   finishedAt: number;
   error?: string;
@@ -123,7 +134,22 @@ export type ResearchRecord = {
   pages: PageRecord[];
 };
 
-export type MemberStepName = "plan" | "research" | "notes" | "opinion";
+/**
+ * The first four are the blind round. The rest only run when the session asks
+ * for them, and only after every member's first opinion is in:
+ * `plan2`, `research2` and `revised` are the Deep speed's second research round;
+ * `cross` is cross-examination; `premortem` is the premortem.
+ */
+export type MemberStepName =
+  | "plan"
+  | "research"
+  | "notes"
+  | "opinion"
+  | "plan2"
+  | "research2"
+  | "revised"
+  | "cross"
+  | "premortem";
 
 export type SeatState = {
   steps: Record<MemberStepName, StepState>;
@@ -138,7 +164,23 @@ export type GeneralistState = {
 };
 
 export type ChairState = {
+  /** Deep speed only: the points the members disagree on, written before the second round. */
+  map: StepState;
   memo: StepState;
+};
+
+/** One thing the members disagree on, worded without saying who holds which side. */
+export type OpenPoint = {
+  id: string;
+  point: string;
+  /** What evidence would settle it. */
+  settle: string;
+};
+
+/** `map.json`: what the second research round is aimed at. */
+export type DisagreementMap = {
+  points: OpenPoint[];
+  createdAt: number;
 };
 
 /**
@@ -147,14 +189,27 @@ export type ChairState = {
  */
 export type SessionKind = "trial" | "board";
 
-/** `fast`: no outside research, one or two members. `standard`: the full flow. */
-export type SessionSpeed = "fast" | "standard";
+/**
+ * `fast`: no outside research, one or two members. `standard`: the full flow.
+ * `deep`: standard, then a second research round aimed at what the members disagree on.
+ */
+export type SessionSpeed = "fast" | "standard" | "deep";
+
+/** Optional rounds after the first opinions are in. */
+export type SessionRounds = {
+  /** Each member reads the others' opinions and answers them. */
+  crossExam?: boolean;
+  /** Each member assumes their own advice was followed and failed, and says why. */
+  premortem?: boolean;
+};
 
 export type SessionSeat = {
   slug: string;
   name: string;
   title: string;
   model?: string;
+  /** Length of the private dossier given to this member only, if any. */
+  dossierChars?: number;
 };
 
 /** Stored as `session.json`. */
@@ -168,6 +223,7 @@ export type SessionMeta = {
   /** Standing context about the owner, copied in when the session started. */
   standing?: string;
   speed?: SessionSpeed;
+  rounds?: SessionRounds;
   /** Also run one generalist on the same material with the same search allowance. */
   withGeneralist?: boolean;
   /** Marks the decision as sensitive: searches always wait for approval. */
@@ -187,6 +243,9 @@ export type SessionDraft = {
   question: string;
   material?: string;
   speed?: SessionSpeed;
+  rounds?: SessionRounds;
+  /** Private material for single members, keyed by member id. Off unless given. */
+  dossiers?: Record<string, string>;
   withGeneralist?: boolean;
   sensitive?: boolean;
   approveSearches?: boolean;
@@ -203,7 +262,22 @@ export type MemberSnapshot = {
   model?: string;
   profile: string;
   directives: string;
+  sources?: OwnSource[];
   files: Array<{ name: string; content: string }>;
+};
+
+/** One proposed addition to a member's `lessons.md`. Nothing is saved until the owner approves it. */
+export type LessonProposal = {
+  id: string;
+  text: string;
+  status: "proposed" | "approved" | "rejected";
+  decidedAt?: number;
+};
+
+/** `lessons.json` in a member's session folder. */
+export type LessonsRecord = {
+  state: StepState;
+  proposals: LessonProposal[];
 };
 
 export type SessionMemberView = SessionSeat & {
@@ -214,6 +288,15 @@ export type SessionMemberView = SessionSeat & {
   notes: string | null;
   /** Null while sealed, even if written. */
   opinion: string | null;
+  /** The owner's private note to this member. The owner wrote it, so it is never sealed. */
+  dossier: string | null;
+  plan2: MemberPlan | null;
+  research2: ResearchRecord | null;
+  /** The opinion after the second research round. Null if the first one stands. */
+  revised: string | null;
+  cross: string | null;
+  premortem: string | null;
+  lessons: LessonsRecord | null;
 };
 
 export type GeneralistView = {
@@ -226,6 +309,7 @@ export type GeneralistView = {
 
 export type ChairView = {
   state: ChairState;
+  map: DisagreementMap | null;
   memo: string | null;
 };
 

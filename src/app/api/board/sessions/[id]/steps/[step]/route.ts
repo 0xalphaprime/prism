@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
 import { syncHandoff } from "@/lib/board/decisions";
 import { boardErrorResponse, readJsonBody } from "@/lib/board/http";
+import { proposeLessons } from "@/lib/board/lessons";
 import { liveDeps } from "@/lib/board/server";
 import {
   runChairStep,
+  runCrossStep,
   runGeneralistMemoStep,
   runGeneralistPlanStep,
   runGeneralistResearchStep,
+  runMapStep,
   runNotesStep,
   runOpinionStep,
+  runPlan2Step,
   runPlanStep,
+  runPremortemStep,
+  runResearch2Step,
   runResearchStep,
+  runRevisedStep,
   setDropped,
   skipGeneralistResearch,
   skipResearch,
@@ -66,8 +73,29 @@ export async function POST(request: Request, ctx: Ctx) {
       case "restore":
         await setDropped(id, member, false);
         break;
+      case "map":
+        outcome = await runMapStep(id, deps, { force });
+        break;
+      case "plan2":
+        outcome = await runPlan2Step(id, member, deps, { force });
+        break;
+      case "research2":
+        outcome = await runResearch2Step(id, member, deps, release);
+        break;
+      case "revised":
+        outcome = await runRevisedStep(id, member, deps, { force });
+        break;
+      case "premortem":
+        outcome = await runPremortemStep(id, member, deps, { force });
+        break;
+      case "cross":
+        outcome = await runCrossStep(id, member, deps, { force });
+        break;
       case "chair":
         outcome = await runChairStep(id, deps, { force });
+        break;
+      case "lessons":
+        outcome = await proposeLessons(id, member, deps, { force });
         break;
       case "generalist-plan":
         outcome = await runGeneralistPlanStep(id, deps, { force });
