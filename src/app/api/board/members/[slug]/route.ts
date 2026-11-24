@@ -7,6 +7,7 @@ import {
   safeSlug,
   updateMember,
 } from "@/lib/board/store";
+import type { OwnSource } from "@/lib/board/types";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,7 @@ type PutBody = {
   profile?: string;
   directives?: string;
   model?: string;
+  sources?: OwnSource[];
 };
 
 export async function PUT(request: Request, ctx: Ctx) {
@@ -45,6 +47,7 @@ export async function PUT(request: Request, ctx: Ctx) {
     for (const key of ["name", "title", "profile", "directives", "model"] as const) {
       if (typeof body[key] === "string") patch[key] = body[key];
     }
+    if (Array.isArray(body.sources)) patch.sources = body.sources;
     const member = await updateMember(slug, patch);
     return NextResponse.json({ member, dir: memberDir(slug) });
   } catch (error) {

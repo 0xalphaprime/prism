@@ -8,7 +8,9 @@ import { ModeChip } from "@/components/shell/mode-chip";
 
 const TABS = [
   { href: "/board", label: "Board" },
+  { href: "/board/decisions", label: "Decisions" },
   { href: "/board/members", label: "Members" },
+  { href: "/board/research", label: "Research desk" },
 ];
 
 function isActive(pathname: string, href: string) {

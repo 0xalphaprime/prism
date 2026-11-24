@@ -2,14 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { boardApi, errorText } from "@/components/board/board-api";
+import { MemberInterview, type InterviewDraft } from "@/components/board/member-interview";
 import { ModelSelect } from "@/components/board/model-select";
 import { BLANK_DIRECTIVES, BLANK_PROFILE } from "@/lib/board/starters";
-import type { Member, MemberSummary } from "@/lib/board/types";
+import type { Member, MemberSummary, OwnSource } from "@/lib/board/types";
+
+type SourceInfo = { id: OwnSource; name: string; ready: boolean; note: string };
 
 type Form = {
   name: string;
   title: string;
   model: string;
+  sources: OwnSource[];
   profile: string;
   directives: string;
   files: Array<{ name: string; content: string }>;
@@ -20,6 +24,7 @@ function toForm(member: Member): Form {
     name: member.name,
     title: member.title,
     model: member.model ?? "",
+    sources: member.sources ?? [],
     profile: member.profile,
     directives: member.directives,
     files: member.files.map((f) => ({ name: f.name, content: f.content })),
@@ -46,6 +51,8 @@ export function MembersWorkspace() {
   const [notice, setNotice] = useState<string | null>(null);
   const [newFileName, setNewFileName] = useState("");
   const [openFile, setOpenFile] = useState<string | null>(null);
+  const [sources, setSources] = useState<SourceInfo[]>([]);
+  const [interviewing, setInterviewing] = useState(false);
 
   const dirty = useMemo(
     () => Boolean(loaded && form && JSON.stringify(toForm(loaded)) !== JSON.stringify(form)),
@@ -73,6 +80,11 @@ export function MembersWorkspace() {
       try {
         const list = await refreshList();
         if (cancelled) return;
+        void boardApi<{ sources: SourceInfo[] }>("/api/board/sources")
+          .then((data) => {
+            if (!cancelled) setSources(data.sources);
+          })
+          .catch(() => undefined);
         const wanted = new URLSearchParams(window.location.search).get("m");
         const first = list.find((m) => m.slug === wanted) ?? list[0];
         if (first) await openMember(first.slug);
@@ -131,6 +143,7 @@ export function MembersWorkspace() {
           name: form.name,
           title: form.title,
           model: form.model,
+          sources: form.sources,
           profile: form.profile,
           directives: form.directives,
         },
@@ -169,6 +182,17 @@ export function MembersWorkspace() {
       await refreshList();
       await openMember(data.member.slug);
       setNotice("New member created. Give it a name and write its profile.");
+    });
+  }
+
+  function createFromInterview(draft: InterviewDraft) {
+    if (!okToLeave()) return;
+    void run(async () => {
+      const data = await boardApi<{ member: Member }>("/api/board/members", { method: "POST", body: draft });
+      await refreshList();
+      await openMember(data.member.slug);
+      setInterviewing(false);
+      setNotice(`${data.member.name} created from the interview. Read the profile and change what is wrong.`);
     });
   }
 
@@ -260,6 +284,9 @@ export function MembersWorkspace() {
           <button type="button" className="btn btn-accent" onClick={createNew} disabled={busy}>
             New member
           </button>
+          <button type="button" className="btn" onClick={() => setInterviewing(true)} disabled={busy || interviewing}>
+            Draft with an interview
+          </button>
           <button type="button" className="btn" onClick={restoreStarters} disabled={busy}>
             Restore starters
           </button>
@@ -272,6 +299,9 @@ export function MembersWorkspace() {
         </p>
       ) : null}
       {notice ? <p className="board-notice">{notice}</p> : null}
+      {interviewing ? (
+        <MemberInterview onCreate={createFromInterview} onClose={() => setInterviewing(false)} />
+      ) : null}
 
       <div className="board-members">
         <aside className="board-member-list" aria-label="Members">
@@ -378,6 +408,36 @@ export function MembersWorkspace() {
                 {count(form.directives)}.
               </small>
             </label>
+
+            <div className="field" data-section="own-sources">
+              <span>Your own records</span>
+              <div className="board-picks">
+                {sources.map((source) => (
+                  <label key={source.id} className={`board-pick${form.sources.includes(source.id) ? " is-on" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={form.sources.includes(source.id)}
+                      onChange={(e) =>
+                        patch({
+                          sources: sources
+                            .map((s) => s.id)
+                            .filter((id) => (id === source.id ? e.target.checked : form.sources.includes(id))),
+                        })
+                      }
+                    />
+                    <span>
+                      <strong>{source.name[0].toUpperCase() + source.name.slice(1)}</strong>
+                      <em className={source.ready ? "" : "board-flag"}>{source.note}</em>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <small className="field-hint">
+                Off by default. A member with a box ticked may search those records as well as the
+                web. Those searches stay inside your own accounts, so they may use names from your
+                material, and each one shows in the research trail.
+              </small>
+            </div>
 
             <div className="board-files">
               <div className="board-files-head">
