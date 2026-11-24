@@ -3625,6 +3625,9 @@ a.btn {
 }
 
 .board-pick input {
+  width: auto;
+  flex: none;
+  padding: 0;
   margin-top: 0.2rem;
   accent-color: var(--accent);
 }
@@ -4127,4 +4130,135 @@ a.btn {
 
 .board-standing-text:focus {
   border-color: var(--accent);
+}
+
+/* Board: decisions */
+
+.board-status {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.12rem 0.6rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+.board-status.is-decided {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  color: var(--ok);
+}
+
+.board-status.is-undecided {
+  border-color: color-mix(in srgb, var(--judge-yellow) 55%, var(--line));
+  color: var(--judge-yellow);
+}
+
+.board-status.is-dropped {
+  color: var(--ink-faint);
+}
+
+.board-decision {
+  border-color: var(--line-strong);
+  scroll-margin-top: 1rem;
+}
+
+.board-decision input[type="date"] {
+  color-scheme: dark;
+}
+
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.board-filters .board-tab {
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.board-loose,
+.board-decision-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.board-loose li {
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--judge-yellow) 50%, var(--line));
+  background: color-mix(in srgb, var(--judge-yellow) 9%, transparent);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.board-loose a {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.board-loose span {
+  color: var(--ink-soft);
+}
+
+.board-decision-row {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-node);
+  padding: 0.65rem 0.8rem;
+}
+
+.board-decision-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.board-decision-row-head a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.board-decision-row-head a:hover {
+  text-decoration: underline;
+}
+
+.board-decision-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr);
+  gap: 0.2rem 0.8rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.board-decision-facts dt {
+  color: var(--ink-faint);
+}
+
+.board-decision-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.board-hold a {
+  color: var(--ink);
+}
+
+@media (max-width: 700px) {
+  .board-decision-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

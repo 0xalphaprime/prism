@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { boardApi, errorText } from "@/components/board/board-api";
+import { DecisionCard } from "@/components/board/decision-card";
 import { Prose } from "@/components/board/prose";
 import {
   allMoves,
@@ -668,6 +669,7 @@ export function SessionWorkspace({ id }: { id: string }) {
           {view.generalist ? <GeneralistCard generalist={view.generalist} run={run} /> : null}
         </div>
       ) : null}
+      {board ? <DecisionCard id={id} chairDone={view.chair?.state.memo.status === "done"} /> : null}
 
       <OverlapCard overlap={view.overlap} view={view} />
 

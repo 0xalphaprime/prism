@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { removeHandoff } from "@/lib/board/decisions";
 import { boardErrorResponse } from "@/lib/board/http";
 import { deleteSession, readSessionView } from "@/lib/board/session-store";
 
@@ -18,7 +19,9 @@ export async function GET(_request: Request, ctx: Ctx) {
 export async function DELETE(_request: Request, ctx: Ctx) {
   const { id } = await ctx.params;
   try {
-    return NextResponse.json(await deleteSession(id));
+    const result = await deleteSession(id);
+    await removeHandoff(id);
+    return NextResponse.json(result);
   } catch (error) {
     return boardErrorResponse(error);
   }
