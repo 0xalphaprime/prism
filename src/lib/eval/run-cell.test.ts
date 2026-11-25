@@ -13,8 +13,8 @@ const item: EvalItem = {
   id: "fixture-1",
   split: "train",
   tags: ["test"],
-  prompt: "Internal Slack: did we flip Oak Hill?",
-  allowedContext: "KEEP Colten + Mario Saturday. Do not declare Oak Hill flipped.",
+  prompt: "Internal Slack: did we flip Northgate?",
+  allowedContext: "KEEP Theo + Marcus Saturday. Do not declare Northgate flipped.",
   goldFacts: [],
   forbiddenClaims: [],
   bits: [],
@@ -92,7 +92,7 @@ describe("runnableItems", () => {
     const set: EvalSet = {
       kind: EVAL_SET_FILE_KIND,
       schemaVersion: 1,
-      id: "prime-leftovers.v1",
+      id: "sample-leftovers.v1",
       name: "test",
       description: "",
       items: [
@@ -120,7 +120,7 @@ describe("runnableItems", () => {
     const set: EvalSet = {
       kind: EVAL_SET_FILE_KIND,
       schemaVersion: 1,
-      id: "prime-leftovers.v1",
+      id: "sample-leftovers.v1",
       name: "test",
       description: "",
       items: [item, { ...item, id: "card-2" }, { ...item, id: "card-3" }],
@@ -135,7 +135,7 @@ describe("runnableItems", () => {
     const set: EvalSet = {
       kind: EVAL_SET_FILE_KIND,
       schemaVersion: 1,
-      id: "prime-leftovers.v1",
+      id: "sample-leftovers.v1",
       name: "test",
       description: "",
       items: [item],
@@ -150,7 +150,7 @@ describe("runnableItems", () => {
     const set: EvalSet = {
       kind: EVAL_SET_FILE_KIND,
       schemaVersion: 1,
-      id: "prime-leftovers.v1",
+      id: "sample-leftovers.v1",
       name: "test",
       description: "",
       items: [item],
@@ -177,7 +177,7 @@ describe("firehose", () => {
       ),
     );
     assert.deepEqual(
-      firehoseHits("KEEP Colten. Do not declare Oak Hill flipped."),
+      firehoseHits("KEEP Theo. Do not declare Northgate flipped."),
       [],
     );
   });

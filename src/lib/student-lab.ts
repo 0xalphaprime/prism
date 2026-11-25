@@ -1,18 +1,34 @@
-import { PRIME_LEFTOVERS_V1 } from "./eval/sets";
+import { SAMPLE_LEFTOVERS_V1 } from "./eval/sets";
 import type { NodeMetrics, RunStatus } from "./types";
 
-/**
- * Signed Oak Hill / Vidonic card from prime-leftovers.v1. missing-fact-8 is OUT
- * (frozen, never signed) — do not point the lab back at it.
- */
-export const STUDENT_LAB_SEED_ID = "polarity-vidonic-1";
+/** Public default: the fictional polarity card (meeting ≠ conversion). */
+export const SAMPLE_STUDENT_SEED_ID = "sample-polarity-1";
 
-const seedItem = PRIME_LEFTOVERS_V1.items.find(
-  (item) => item.id === STUDENT_LAB_SEED_ID,
-);
-if (!seedItem?.prompt.trim() || !seedItem.allowedContext.trim()) {
-  throw new Error(`Student lab seed “${STUDENT_LAB_SEED_ID}” is not a signed card`);
+type SeedCard = { id: string; prompt: string; allowedContext: string };
+
+/**
+ * Local override. `PRISM_STUDENT_SEED_ID` in `.env.local` names a card in a
+ * private eval set; next.config.ts inlines that card as `PRISM_STUDENT_SEED`.
+ */
+function privateSeed(): SeedCard | null {
+  const raw = process.env.PRISM_STUDENT_SEED?.trim();
+  if (!raw) return null;
+  try {
+    const card = JSON.parse(raw) as SeedCard;
+    return card.id && card.prompt?.trim() && card.allowedContext?.trim() ? card : null;
+  } catch {
+    return null;
+  }
 }
+
+const seedItem: SeedCard | undefined =
+  privateSeed() ??
+  SAMPLE_LEFTOVERS_V1.items.find((item) => item.id === SAMPLE_STUDENT_SEED_ID);
+if (!seedItem?.prompt.trim() || !seedItem.allowedContext.trim()) {
+  throw new Error(`Student lab seed “${SAMPLE_STUDENT_SEED_ID}” is not a signed card`);
+}
+
+export const STUDENT_LAB_SEED_ID = seedItem.id;
 
 export const STUDENT_LAB_PROMPT = seedItem.prompt;
 

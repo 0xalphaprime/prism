@@ -264,11 +264,11 @@ Use this when you want inspectable exhaust for the local student — not a LoRA 
 
 Model values are a bare Ollama tag or a full `provider:model` ref. `PRIMARY_MODEL` and `PRIOR_STUDENT_MODEL` are inlined at build time (`next.config.ts`), so restart `next dev` after changing them.
 
-Seeded lab card: `polarity-vidonic-1` (signed, in `prime-leftovers.v1`). `missing-fact-8` is **OUT** — frozen, never signed, and removed from the eval set. Don’t re-seed it or invent a replacement.
+Seeded lab card: the fictional `sample-polarity-1` (in the public `sample-leftovers.v1`). To seed from a real card instead, set `PRISM_STUDENT_SEED_ID` in `.env.local` to a card id from a private set (see **Private data** below), then restart `next dev`.
 
 1. Open **More → Template…** and pick **Student vs teachers**. If the canvas is empty, Prism restores that graph on first load.
 2. Connections: OpenRouter as default channel for *new teacher tiles*. Do **not** click **Apply to this graph** if you only meant to remap teachers — Ollama/Nemo is pinned and will stay, but you still don’t need a full remap.
-3. Put one sharp leftover in Hub notes (or keep the seeded `polarity-vidonic-1` brief). Architecture **Prompt** is the run intent.
+3. Put one sharp leftover in Hub notes (or keep the seeded brief). Architecture **Prompt** is the run intent.
 4. **Step** (or **Run all**) — you land on **Trace**. Spine plus cells: Hub → specialists → Judge → **Nemo after Judge**. First pass: Step, not Run all. Teacher/Critic **must not** list Nemo in **saw** — isolation fail skips the student causal row. Second-pass Nemo **should** list Hub, first Nemo, teachers, and Judge — that hop is the “can it answer better with the pack?” check.
 5. Distill target is Judge **keep / omit / never-say** chips (and the JSON trailer), not the essay → Foundry `SYSTEM.md`, then `run_eval.py --think`. Do **not** paste Judge prose into the *isolated* student prompt. Causal pack is Hub+intent → first Nemo when isolation holds. **Nemo after Judge** is `includeInSamples: false` — it may ingest the Judge card; it is not the SFT row.
 
@@ -313,7 +313,21 @@ Isolation is per-architecture:
 - Eval teacher refine: Teacher **must** see first Nemo.
 - Eval teacher+critic second hop: Nemo **must not** ingest Teacher/Critic prose.
 
-Frozen set: [`data/eval/prime-leftovers.v1.json`](../data/eval/prime-leftovers.v1.json). Ingest is **Import signed item** on `/eval` (or a dual-write into that JSON) after Alex signs. Do not invent gold.
+Sets: the public demo is [`data/eval/sample-leftovers.v1.json`](../data/eval/sample-leftovers.v1.json) — a fictional distributor (Kestrel Surgical), invented names throughout, one card per failure mode. Each sample card's `referenceAnswer` must score 1 on its own bits (`score.test.ts` enforces this). Real sets live in the private folder (below) and are listed first on `/eval`. Ingest is **Import signed item** on `/eval`: it replaces the card with the same id in whichever set holds it, so real cards never land in the public file. Do not invent gold.
+
+#### Private data
+
+This repo is public. Real company data — eval sets, rep and account names, deal context — never goes in a tracked file.
+
+| What | Where |
+|------|-------|
+| Real eval sets | `data/eval/private/*.json` (git-ignored), or the folder in `PRISM_PRIVATE_EVAL_DIR` |
+| Tests that quote real cards | `src/lib/eval/*.private.test.ts` (git-ignored; skip when the private set is absent) |
+| Who the student writes as | `PRISM_ORG_NAME` in `.env.local` (default “our team”) |
+| Student vs teachers seed | `PRISM_STUDENT_SEED_ID` in `.env.local` (default `sample-polarity-1`) |
+| Terms to block | `.private-terms` (git-ignored), one per line |
+
+`npm install` points git at `.githooks/`, whose pre-commit hook runs `scripts/check-private-terms.mjs`: any staged line or file name containing a `.private-terms` entry blocks the commit. `npm run check:private` scans every tracked file. With no `.private-terms` file (fresh clones, cloud agents) the check does nothing, so agents follow the rule in `AGENTS.md` instead.
 
 Eval cell contract (do not “improve” this with Knowledge / Skills / Airtable):
 

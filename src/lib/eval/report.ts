@@ -181,7 +181,8 @@ export function experimentToTrainJsonl(record: ExperimentRecord): string {
   for (const cell of record.cells) {
     if (cell.status !== "done") continue;
     const item = set?.items.find((i) => i.id === cell.itemId);
-    if (item?.split === "held-out") continue;
+    // Unknown split (set not loaded, or card removed) is never safe to train on.
+    if (!item || item.split === "held-out") continue;
     const student = cell.nodeResults.find((r) => r.nodeId === STUDENT_NODE_ID);
     if (!student) continue;
     if (

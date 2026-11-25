@@ -1,9 +1,10 @@
 import { hashJson } from "@/lib/hash";
-import bundledSet from "../../../data/eval/prime-leftovers.v1.json";
+import bundledSet from "../../../data/eval/sample-leftovers.v1.json";
 import type { EvalItem, EvalSet } from "./types";
 import { EVAL_SET_FILE_KIND } from "./types";
 
-export const PRIME_LEFTOVERS_SET_ID = "prime-leftovers.v1";
+/** Public, fictional demo set. Real company sets live in `data/eval/private/` (git-ignored). */
+export const SAMPLE_LEFTOVERS_SET_ID = "sample-leftovers.v1";
 
 /** Client-safe. Live disk reads live in `sets-disk.ts` (server-only). */
 export function asEvalSet(raw: unknown): EvalSet {
@@ -14,10 +15,22 @@ export function asEvalSet(raw: unknown): EvalSet {
   return parsed;
 }
 
-export const PRIME_LEFTOVERS_V1 = asEvalSet(bundledSet);
+export const SAMPLE_LEFTOVERS_V1 = asEvalSet(bundledSet);
+
+/**
+ * Sets the server reported (including private ones that are never bundled).
+ * The Eval page registers them once `/api/eval/sets` answers, so reports,
+ * stats and train exports can resolve item splits and tags client-side.
+ */
+const liveSets = new Map<string, EvalSet>();
+
+export function rememberEvalSets(sets: EvalSet[]) {
+  for (const set of sets) liveSets.set(set.id, set);
+}
 
 export function listEvalSets(): EvalSet[] {
-  return [PRIME_LEFTOVERS_V1];
+  const bundled = liveSets.has(SAMPLE_LEFTOVERS_V1.id) ? [] : [SAMPLE_LEFTOVERS_V1];
+  return [...liveSets.values(), ...bundled];
 }
 
 export function getEvalSet(id: string): EvalSet | undefined {

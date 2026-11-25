@@ -1,0 +1,4 @@
+#!/bin/sh
+# Blocks commits that add terms listed in the git-ignored .private-terms file.
+# Installed by `npm install` (prepare script) via core.hooksPath.
+exec node scripts/check-private-terms.mjs

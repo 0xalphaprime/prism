@@ -41,7 +41,7 @@ function record(cells: ExperimentCell[]): ExperimentRecord {
     schemaVersion: 1,
     id: "exp-1",
     name: "test",
-    evalSetId: "prime-leftovers.v1",
+    evalSetId: "sample-leftovers.v1",
     architectureIds: [
       "eval-baseline",
       "eval-teacher-refine",

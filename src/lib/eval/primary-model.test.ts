@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { STUDENT_LAB_HUB, STUDENT_LAB_PROMPT, STUDENT_LAB_SEED_ID } from "@/lib/student-lab";
+import {
+  SAMPLE_STUDENT_SEED_ID,
+  STUDENT_LAB_HUB,
+  STUDENT_LAB_PROMPT,
+  STUDENT_LAB_SEED_ID,
+} from "@/lib/student-lab";
 import { STUDENT_MODEL } from "@/lib/student-graph";
 import {
   DEFAULT_MODEL_BY_PROVIDER,
@@ -10,7 +15,7 @@ import {
 } from "@/lib/providers";
 import { BUILT_IN_PRESETS } from "@/lib/node-presets";
 import { EVAL_ARCHITECTURES } from "./graphs";
-import { getEvalSet } from "./sets";
+import { getEvalSet, SAMPLE_LEFTOVERS_SET_ID } from "./sets";
 
 const expectedPrimary = `ollama:${process.env.PRIMARY_MODEL?.trim() || "muse-glimmer:30b"}`;
 
@@ -40,10 +45,10 @@ describe("Foundry PRIMARY defaults", () => {
 });
 
 describe("student lab seed", () => {
-  it("is a signed card in prime-leftovers, not missing-fact-8", () => {
-    const set = getEvalSet("prime-leftovers.v1");
+  it("defaults to the fictional sample polarity card", () => {
+    const set = getEvalSet(SAMPLE_LEFTOVERS_SET_ID);
     assert.ok(set);
-    assert.ok(!set.items.some((i) => i.id === "missing-fact-8"));
+    assert.equal(STUDENT_LAB_SEED_ID, SAMPLE_STUDENT_SEED_ID);
     const item = set.items.find((i) => i.id === STUDENT_LAB_SEED_ID);
     assert.ok(item);
     assert.equal(STUDENT_LAB_PROMPT, item.prompt);

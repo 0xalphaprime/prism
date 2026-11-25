@@ -1,8 +1,7 @@
 import { writeFileSync } from "node:fs";
 import type { BinaryBit, EvalItem, EvalSet, EvalSplit } from "./types";
 import { assertNoFirehose } from "./firehose";
-import { PRIME_LEFTOVERS_SET_ID } from "./sets";
-import { getEvalSetLive, PRIME_LEFTOVERS_PATH } from "./sets-disk";
+import { listEvalSetFiles } from "./sets-disk";
 
 const SPLITS = new Set<EvalSplit>(["train", "dev", "held-out"]);
 const BIT_KINDS = new Set([
@@ -78,19 +77,25 @@ export function coerceEvalItem(raw: unknown): EvalItem {
   return item;
 }
 
+/**
+ * Replace an existing card in whichever set already holds its id (private
+ * sets are checked first). Real cards therefore land in the git-ignored
+ * private set, never in the public sample file.
+ */
 export function upsertEvalItem(item: EvalItem): EvalSet {
-  const set = getEvalSetLive(PRIME_LEFTOVERS_SET_ID);
-  if (!set) throw new Error("prime-leftovers.v1 is missing");
-  const idx = set.items.findIndex((row) => row.id === item.id);
-  if (idx < 0) {
+  const target = listEvalSetFiles().find((row) =>
+    row.set.items.some((existing) => existing.id === item.id),
+  );
+  if (!target) {
     throw new Error(
-      `Unknown eval item id “${item.id}”. Import only replaces an existing shell.`,
+      `Unknown eval item id “${item.id}”. Import only replaces an existing shell — add the id to a set in data/eval/private/ first.`,
     );
   }
+  const { set, file } = target;
   const next: EvalSet = {
     ...set,
-    items: set.items.map((row, i) => (i === idx ? item : row)),
+    items: set.items.map((row) => (row.id === item.id ? item : row)),
   };
-  writeFileSync(PRIME_LEFTOVERS_PATH, `${JSON.stringify(next, null, 2)}\n`);
+  writeFileSync(file, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }

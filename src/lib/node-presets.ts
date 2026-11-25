@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { newId } from "./id";
 import { PRIMARY_MODEL, type ModelRef } from "./providers";
+import { ORG_NAME } from "@/lib/org";
 
 export const NODE_PRESETS_KEY = "prism.nodePresets.v1";
 
@@ -161,7 +162,7 @@ export const BUILT_IN_PRESETS: NodePreset[] = [
       label: "Nemo",
       role: "Local student — attempt the run intent from Hub only",
       steer:
-        "Do the job as Prime. Omit what you don’t have. Never invent. Never mention the eval harness.",
+        `Do the job as ${ORG_NAME}. Omit what you don’t have. Never invent. Never mention the eval harness.`,
       prompt:
         "From the architecture prompt and Hub notes only, produce the outbound draft. If a fact is missing, say we don’t have it.",
       model: PRIMARY_MODEL,

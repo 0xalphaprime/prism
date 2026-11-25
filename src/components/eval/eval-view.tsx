@@ -19,6 +19,7 @@ import {
   type EvalSet,
   type ExperimentRecord,
 } from "@/lib/eval/types";
+import { rememberEvalSets } from "@/lib/eval/sets";
 import { useGraphStore } from "@/store/graph-store";
 
 type Catalog = {
@@ -62,6 +63,11 @@ function downloadText(filename: string, text: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Keep the current pick if the server still lists it; else its first set (private before sample). */
+function pickSetId(curr: string, next: Catalog): string {
+  return next.sets.some((set) => set.id === curr) ? curr : (next.sets[0]?.id ?? "");
+}
+
 function findItem(catalog: Catalog | null, evalSetId: string, itemId?: string): EvalItem | undefined {
   if (!itemId) return undefined;
   return catalog?.sets.find((s) => s.id === evalSetId)?.items.find((row) => row.id === itemId);
@@ -73,7 +79,9 @@ export function EvalView() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [experiment, setExperiment] = useState<ExperimentRecord | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
-  const [evalSetId, setEvalSetId] = useState("prime-leftovers.v1");
+  // Empty until the catalog loads; then the first set the server lists
+  // (a private set when one exists, otherwise the public sample).
+  const [evalSetId, setEvalSetId] = useState("");
   const [archs, setArchs] = useState<EvalArchitectureId[]>([...EVAL_ARCHITECTURE_IDS]);
   const [reps, setReps] = useState(1);
   const [temperature, setTemperature] = useState("0.4");
@@ -94,7 +102,13 @@ export function EvalView() {
       try {
         const catalogRes = await fetch("/api/eval/sets");
         const catalogData = (await catalogRes.json()) as Catalog;
-        if (!cancelled) setCatalog(catalogData);
+        if (!cancelled) {
+          // Private sets are never bundled; register them so reports, stats
+          // and train exports can resolve each card's split and tags.
+          rememberEvalSets(catalogData.sets);
+          setCatalog(catalogData);
+          setEvalSetId((curr) => pickSetId(curr, catalogData));
+        }
         const listRes = await fetch("/api/eval/experiments");
         const listData = (await listRes.json()) as {
           experiments?: Array<{ id: string; status: string }>;
@@ -144,7 +158,9 @@ export function EvalView() {
   const refreshCatalog = async () => {
     const catalogRes = await fetch("/api/eval/sets");
     const catalogData = (await catalogRes.json()) as Catalog;
+    rememberEvalSets(catalogData.sets);
     setCatalog(catalogData);
+    setEvalSetId((curr) => pickSetId(curr, catalogData));
   };
 
   const rememberItem = (id: string) => {
@@ -420,7 +436,7 @@ export function EvalView() {
               >
                 {(catalog?.sets ?? []).map((set) => (
                   <option key={set.id} value={set.id}>
-                    Eval set · {set.runnable}/{set.total} ready
+                    {set.name} · {set.runnable}/{set.total} ready
                   </option>
                 ))}
               </select>
