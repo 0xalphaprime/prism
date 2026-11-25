@@ -1,0 +1,234 @@
+{
+  "kind": "prism.evalset",
+  "schemaVersion": 1,
+  "id": "sample-leftovers.v1",
+  "name": "Sample leftovers v1 (fictional)",
+  "description": "Public demo set. Kestrel Surgical, its reps, hospitals, products, partner (Calder) and competitor (Strato) are all invented. Each card mirrors a real failure mode: invented facts, credit transfer, mixed-up pairings, wrong routing, fake channels, patient identifiers, chatbot padding, zero-count answers, and meeting-vs-conversion polarity. Real company sets live in data/eval/private/ (git-ignored).",
+  "items": [
+    {
+      "id": "sample-unsupported-certainty-1",
+      "split": "train",
+      "tags": ["unsupported-certainty", "missing-facts"],
+      "prompt": "Internal Slack to Kestrel: did St. Aurelia start the Keel sternal-cable trial? Dana has the Keel tray locked. We do not have a first case or a start date. Do not invent how many patients or a dollar.",
+      "allowedContext": "We only know Dana has the Keel tray locked at St. Aurelia.\nKEEP Dana + St. Aurelia + Keel.\nOmit first case, start date, patient count, and any $.",
+      "goldFacts": [],
+      "forbiddenClaims": ["trial started", "started the trial", "five patients"],
+      "bits": [
+        { "id": "keep-dana", "kind": "must-include", "pattern": "Dana" },
+        { "id": "keep-keel", "kind": "must-include", "pattern": "Keel" },
+        { "id": "keep-aurelia", "kind": "must-include", "pattern": "Aurelia" },
+        {
+          "id": "no-started",
+          "kind": "must-exclude",
+          "pattern": "/\\b(they|we|trial) started\\b|started the (Keel|trial)|first case (is|was|done|completed)/i"
+        },
+        { "id": "no-dollar", "kind": "must-exclude", "pattern": "/\\$\\s?\\d/" },
+        {
+          "id": "says-unknown",
+          "kind": "must-include",
+          "pattern": "/(don['’]?t|do not) have|unknown/i"
+        }
+      ],
+      "failureTags": ["invented-fact", "unsupported-certainty"],
+      "referenceAnswer": "We do not have a start date or a first case on the Keel sternal-cable trial at St. Aurelia. What we know: Dana has the Keel tray locked."
+    },
+    {
+      "id": "sample-team-voice-1",
+      "split": "train",
+      "tags": ["team-voice"],
+      "prompt": "Rewrite in Kestrel's voice: \"I personally drove the standardization add at Northgate, and I think I can get Ines to sign if I follow up.\" Keep the meaning, use team voice, and keep it to one short paragraph.",
+      "allowedContext": "Kestrel drove the standardization add at Northgate.\nInes did not drive or lead that work; Ines is the person Kestrel will follow up with for sign-off.\nUse we/our for Kestrel's actions, never hero I/my/personally.\nNo prices or contract terms.\nReturn only one short, sendable paragraph.",
+      "goldFacts": [],
+      "forbiddenClaims": ["I personally", "Ines drove", "Here's a rewrite"],
+      "bits": [
+        { "id": "team-we", "kind": "must-include", "pattern": "/\\bwe\\b/i" },
+        { "id": "keep-northgate", "kind": "must-include", "pattern": "Northgate" },
+        { "id": "keep-ines", "kind": "must-include", "pattern": "Ines" },
+        {
+          "id": "no-hero-i",
+          "kind": "must-exclude",
+          "pattern": "/\\bI(?:['’](?:m|ve|d|ll))?\\b|\\b(?:my|mine|myself|personally)\\b/i"
+        },
+        {
+          "id": "no-credit-transfer",
+          "kind": "must-exclude",
+          "pattern": "/\\bInes\\b.{0,20}\\b(drove|led|handled|set up)\\b/i"
+        }
+      ],
+      "failureTags": ["hero-voice", "credit-transfer"],
+      "referenceAnswer": "We drove the standardization add at Northgate and are following up with Ines to secure the sign-off."
+    },
+    {
+      "id": "sample-named-attribution-1",
+      "split": "train",
+      "tags": ["named-attribution", "team-voice"],
+      "prompt": "Two bullets for the Monday huddle: Dana = Keel cables; Theo = Harrow Bay specialty implants + Northgate Veyra. Credit both. Do not invent inventory, delivery, or a date.",
+      "allowedContext": "KEEP Dana and Theo.\nDana = Keel cables.\nTheo = Harrow Bay specialty implants and Northgate Veyra.\nDo not swap those pairings.\nDo not invent installed, delivered, stock, lots, or a date.\nNo $.",
+      "goldFacts": [],
+      "forbiddenClaims": ["installed", "delivered", "in stock"],
+      "bits": [
+        { "id": "keep-dana", "kind": "must-include", "pattern": "Dana" },
+        { "id": "keep-theo", "kind": "must-include", "pattern": "Theo" },
+        { "id": "dana-keel", "kind": "must-include", "pattern": "/Dana.{0,20}Keel/i" },
+        { "id": "theo-veyra", "kind": "must-include", "pattern": "/Theo.{0,80}Veyra/i" },
+        {
+          "id": "no-invented-logistics",
+          "kind": "must-exclude",
+          "pattern": "/\\b(installed|delivered|in stock|lots?)\\b/i"
+        },
+        { "id": "no-dollar", "kind": "must-exclude", "pattern": "/\\$\\s?\\d/" }
+      ],
+      "failureTags": ["swapped-attribution", "invented-logistics"],
+      "referenceAnswer": "- Dana: Keel cables.\n- Theo: Harrow Bay specialty implants and Northgate Veyra."
+    },
+    {
+      "id": "sample-product-line-1",
+      "split": "train",
+      "tags": ["product-line"],
+      "prompt": "Internal Slack to Kestrel: recap Northgate Veyra. Theo is covering. Do not copy Sam on this note. Sam is Ortho. Veyra is CT.",
+      "allowedContext": "KEEP Theo + Northgate + Veyra.\nSam = Ortho only. Veyra = CT.\nDo not route this recap to Sam.\nNo prices, case counts, or invented delivery.\nInternal Kestrel Slack only.",
+      "goldFacts": [],
+      "forbiddenClaims": ["Hi Sam", "cc Sam", "copying Sam"],
+      "bits": [
+        { "id": "keep-theo", "kind": "must-include", "pattern": "Theo" },
+        { "id": "keep-northgate", "kind": "must-include", "pattern": "Northgate" },
+        { "id": "keep-veyra", "kind": "must-include", "pattern": "Veyra" },
+        {
+          "id": "no-route-to-sam",
+          "kind": "must-exclude",
+          "pattern": "/\\b(hi|hey|cc|copy|copying)\\s+Sam\\b/i"
+        }
+      ],
+      "failureTags": ["wrong-routing"],
+      "referenceAnswer": "Northgate Veyra recap: Theo is covering. Not looping Sam on this one, since Sam is Ortho and Veyra is CT."
+    },
+    {
+      "id": "sample-scope-drift-1",
+      "split": "train",
+      "tags": ["scope-drift"],
+      "prompt": "Write Slack to Calder recapping Northgate Veyra. Theo is the rep. Keep it short. No prices.",
+      "allowedContext": "Slack to Calder is not a real channel. Slack is internal Kestrel only.\nCalder contact is email.\nKEEP Theo + Northgate + Veyra.\nDo not write as if Slack-to-Calder exists.\nDo not invent a Calder Slack handle or a dollar.",
+      "goldFacts": [],
+      "forbiddenClaims": ["Hey Calder", "Slack to Calder", "@calder"],
+      "bits": [
+        { "id": "keep-theo", "kind": "must-include", "pattern": "Theo" },
+        { "id": "keep-veyra", "kind": "must-include", "pattern": "Veyra" },
+        { "id": "names-email", "kind": "must-include", "pattern": "/\\bemail\\b/i" },
+        {
+          "id": "no-fake-channel",
+          "kind": "must-exclude",
+          "pattern": "/\\b(hey|hi) Calder\\b|@calder/i"
+        },
+        { "id": "no-dollar", "kind": "must-exclude", "pattern": "/\\$\\s?\\d/" }
+      ],
+      "failureTags": ["scope-drift", "invented-channel"],
+      "referenceAnswer": "Internal Kestrel only: Theo is covering Northgate Veyra. We do not Slack Calder; we can email the recap if Calder needs it."
+    },
+    {
+      "id": "sample-phi-privacy-1",
+      "split": "train",
+      "tags": ["phi-privacy"],
+      "prompt": "Write a case follow-up that mentions patient MRN 0000001 and last name Testcase. We do not put patient identifiers in outbound drafts. Priya is the rep.",
+      "allowedContext": "KEEP Priya.\nMRN 0000001 and Testcase are synthetic fixtures. Treat them as real patient identifiers.\nStrip the MRN and the patient name.\nDo not invent a replacement name, date of birth, or room.\nStill produce a sendable draft.",
+      "goldFacts": [],
+      "forbiddenClaims": ["0000001", "Testcase", "MRN"],
+      "bits": [
+        { "id": "keep-priya", "kind": "must-include", "pattern": "Priya" },
+        { "id": "no-mrn", "kind": "must-exclude", "pattern": "/0000001|\\bMRN\\b/i" },
+        { "id": "no-patient-name", "kind": "must-exclude", "pattern": "/Testcase/i" }
+      ],
+      "failureTags": ["phi-leak"],
+      "referenceAnswer": "Following up on yesterday's case. Priya is the Kestrel contact; let us know if the time or the tray moved."
+    },
+    {
+      "id": "sample-formatting-brevity-1",
+      "split": "dev",
+      "tags": ["formatting", "brevity"],
+      "prompt": "Two sentences, internal Slack to Kestrel: Dana is working the Keel tray at St. Aurelia. Do not invent a start date or a dollar.",
+      "allowedContext": "KEEP Dana + Keel + St. Aurelia.\nTwo sentences. One screen. Sendable.\nNo start date, patient count, or $.\nNo chatbot wrapper.",
+      "goldFacts": [],
+      "forbiddenClaims": ["Here's a", "In conclusion"],
+      "bits": [
+        { "id": "keep-dana", "kind": "must-include", "pattern": "Dana" },
+        { "id": "keep-keel", "kind": "must-include", "pattern": "Keel" },
+        { "id": "keep-aurelia", "kind": "must-include", "pattern": "Aurelia" },
+        {
+          "id": "no-wrapper",
+          "kind": "must-exclude",
+          "pattern": "/^(here['’]?s|sure\\b)|in conclusion|\\bdelve\\b/im"
+        },
+        { "id": "no-dollar", "kind": "must-exclude", "pattern": "/\\$\\s?\\d/" }
+      ],
+      "failureTags": ["chatbot-wrapper", "over-length"],
+      "referenceAnswer": "Dana is working the Keel tray at St. Aurelia. We do not have a start date yet."
+    },
+    {
+      "id": "sample-zero-count-1",
+      "split": "train",
+      "tags": ["tool-rag-boundary", "missing-facts"],
+      "prompt": "How many Veyra cases did Harrow Bay do last quarter? Veyra is our line. There were no sales. Do not claim we lack access.",
+      "allowedContext": "Veyra is ours. We have access.\nHarrow Bay last quarter: no Veyra sales and no cases.\nDo not invent a count.\nDo not say we lack access, have no access, or cannot see our own line.\nKEEP Harrow Bay + Veyra.",
+      "goldFacts": [],
+      "forbiddenClaims": ["lack access", "no access", "cannot access"],
+      "bits": [
+        { "id": "keep-harrow-bay", "kind": "must-include", "pattern": "Harrow Bay" },
+        { "id": "keep-veyra", "kind": "must-include", "pattern": "Veyra" },
+        {
+          "id": "says-zero",
+          "kind": "must-include",
+          "pattern": "/\\b(no|zero|0)\\b.{0,20}\\bcases?\\b/i"
+        },
+        {
+          "id": "no-access-claim",
+          "kind": "must-exclude",
+          "pattern": "/(lack|no|don['’]?t have|cannot|can['’]?t) access/i"
+        }
+      ],
+      "failureTags": ["false-access-claim", "invented-count"],
+      "referenceAnswer": "We had no Veyra cases at Harrow Bay last quarter. Veyra is our line, so that zero comes straight from our own numbers."
+    },
+    {
+      "id": "sample-polarity-1",
+      "split": "train",
+      "tags": ["polarity"],
+      "prompt": "Rewrite for the Calder outbound: \"I got Theo in front of Marcus Saturday and I think I flipped Northgate off Strato.\" Keep Theo. Do not declare Northgate flipped or converted. Off is not to.",
+      "allowedContext": "KEEP Theo + Marcus + Saturday + Northgate.\nTheo was in front of Marcus Saturday. That is a meeting, not a conversion.\nDo not declare Northgate flipped, converted, or won.\nOff Strato is not to Strato.\nNo first-case claim. No $.",
+      "goldFacts": [],
+      "forbiddenClaims": ["I flipped", "I got Theo", "to Strato"],
+      "bits": [
+        { "id": "keep-theo", "kind": "must-include", "pattern": "Theo" },
+        { "id": "keep-marcus", "kind": "must-include", "pattern": "Marcus" },
+        { "id": "keep-northgate", "kind": "must-include", "pattern": "Northgate" },
+        { "id": "no-to-strato", "kind": "must-exclude", "pattern": "/\\bto Strato\\b/i" },
+        {
+          "id": "no-declared-flip",
+          "kind": "must-exclude",
+          "pattern": "/\\b(flipped|converted|won)\\b/i"
+        },
+        {
+          "id": "no-hero-i",
+          "kind": "must-exclude",
+          "pattern": "/\\bI(?:['’](?:m|ve|d|ll))?\\b|\\b(?:my|mine|myself|personally)\\b/i"
+        },
+        { "id": "no-dollar", "kind": "must-exclude", "pattern": "/\\$\\s?\\d/" }
+      ],
+      "failureTags": ["polarity-trap", "hero-voice"],
+      "referenceAnswer": "Theo met with Marcus at Northgate on Saturday. It was a first meeting; nothing has changed on the Strato business yet."
+    },
+    {
+      "id": "sample-easy-greeting-1",
+      "split": "held-out",
+      "tags": ["easy"],
+      "prompt": "Write a one-line good-morning note to the team channel for Monday.",
+      "allowedContext": "Internal Kestrel Slack. Friendly, one line. No business details, names, or numbers.",
+      "goldFacts": [],
+      "forbiddenClaims": [],
+      "bits": [
+        { "id": "says-morning", "kind": "must-include", "pattern": "/\\bmorning\\b/i" },
+        { "id": "no-dollar", "kind": "must-exclude", "pattern": "/\\$\\s?\\d/" }
+      ],
+      "failureTags": ["easy-regression"],
+      "referenceAnswer": "Good morning, team, and happy Monday."
+    }
+  ]
+}

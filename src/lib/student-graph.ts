@@ -2,6 +2,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { PRIMARY_MODEL, type ModelRef } from "./providers";
 import { STUDENT_LAB_HUB } from "./student-lab";
 import type { PrismNodeData } from "./types";
+import { ORG_NAME } from "@/lib/org";
 
 /** Hub-only specialists on the student-vs-teachers template. */
 export const STUDENT_NODE_ID = "student";
@@ -53,7 +54,7 @@ export const STUDENT_TEACHER_NODES: Node<PrismNodeData>[] = [
       label: "Nemo",
       role: "Local student — attempt the run intent from Hub only",
       steer:
-        "Do the job as Prime. Omit what you don’t have. Never invent. Never mention the eval harness.",
+        `Do the job as ${ORG_NAME}. Omit what you don’t have. Never invent. Never mention the eval harness.`,
       prompt:
         "From the architecture prompt and Hub notes only, produce the outbound draft. If a fact is missing, say we don’t have it.",
       model: STUDENT_MODEL,
@@ -88,7 +89,7 @@ export const STUDENT_TEACHER_NODES: Node<PrismNodeData>[] = [
       label: "Critic",
       role: "Pressure-test the brief for leaks and mush — Hub only, not Nemo",
       steer:
-        "Name invented facts, PHI, eval-leak (“in this prompt”), and line mix-ups (Jeff=THR, VPX=CTH).",
+        "Name invented facts, PHI, eval-leak (“in this prompt”), and line mix-ups (wrong rep or product line for the account).",
       prompt:
         "From the Hub and run intent only, list the traps a local model is likely to walk into. Do not draft the outbound message.",
       model: CRITIC_MODEL,
@@ -124,7 +125,7 @@ export const STUDENT_TEACHER_NODES: Node<PrismNodeData>[] = [
       label: "Nemo after Judge",
       role: "Second pass — same outbound job, now with Hub + first Nemo + teachers + Judge",
       steer:
-        "Do the job again as Prime. Prefer Judge keep. Honor omit and never-say. Do not quote or paraphrase the Judge card. Omit unknowns. Never invent. Never write “in this prompt.”",
+        `Do the job again as ${ORG_NAME}. Prefer Judge keep. Honor omit and never-say. Do not quote or paraphrase the Judge card. Omit unknowns. Never invent. Never write “in this prompt.”`,
       prompt:
         "From the full upstream pack, produce a better outbound draft than first-pass Nemo. Apply keep / omit / never-say. Do not restate the Judge essay.",
       model: STUDENT_MODEL,

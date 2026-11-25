@@ -9,11 +9,12 @@ import {
 } from "@/lib/student-graph";
 import type { PrismNodeData } from "@/lib/types";
 import type { EvalArchitectureId, ExperimentProfile } from "./types";
+import { ORG_NAME } from "@/lib/org";
 
 export const EVAL_INFORMED_ID = "informed";
 
 const NEMO_STEER =
-  "Do the job as Prime. Omit what you don’t have. Never invent. Never mention the eval harness.";
+  `Do the job as ${ORG_NAME}. Omit what you don’t have. Never invent. Never mention the eval harness.`;
 const NEMO_PROMPT =
   "From the architecture prompt and Hub notes only, produce the outbound draft. If a fact is missing, say we don’t have it.";
 
@@ -102,7 +103,7 @@ export const EVAL_ARCHITECTURES: EvalArchitectureGraph[] = [
         label: "Nemo after Teacher",
         role: "Second pass — revise from Teacher feedback",
         steer:
-          "Do the job again as Prime. Apply the Teacher notes. Omit unknowns. Never invent. Never write “in this prompt.”",
+          `Do the job again as ${ORG_NAME}. Apply the Teacher notes. Omit unknowns. Never invent. Never write “in this prompt.”`,
         prompt:
           "From Hub, your first draft, and Teacher feedback, produce a better outbound draft. Do not quote the Teacher essay.",
         model: STUDENT_MODEL,
@@ -169,7 +170,7 @@ export const EVAL_ARCHITECTURES: EvalArchitectureGraph[] = [
         label: "Nemo after Judge",
         role: "Second pass — Hub + first Nemo + Judge card only",
         steer:
-          "Do the job again as Prime. Prefer Judge keep. Honor omit and never-say. Do not quote the Judge card. Omit unknowns. Never invent. Never write “in this prompt.”",
+          `Do the job again as ${ORG_NAME}. Prefer Judge keep. Honor omit and never-say. Do not quote the Judge card. Omit unknowns. Never invent. Never write “in this prompt.”`,
         prompt:
           "From Hub, your first draft, and the Judge characteristic card, produce a better outbound draft. Do not restate the Judge essay.",
         model: STUDENT_MODEL,

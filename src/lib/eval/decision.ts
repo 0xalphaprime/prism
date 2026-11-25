@@ -43,7 +43,8 @@ export function buildDecisionNotes(record: ExperimentRecord): string[] {
       allFailMissingContext += 1;
     }
 
-    const voiceTag = (item?.tags ?? []).includes("prime-voice");
+    // Voice cards are tagged `<org>-voice` or `team-voice`.
+    const voiceTag = (item?.tags ?? []).some((tag) => tag.endsWith("-voice"));
     if (voiceTag && passed(baseline?.first) && (refine?.lift ?? 0) <= 0) {
       voiceWhileFacts += 1;
     }

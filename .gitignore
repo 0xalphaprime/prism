@@ -44,6 +44,14 @@ yarn-error.log*
 # board members, sessions and decisions (private; never commit)
 /data/board/
 
+# real company data — eval sets, private-only tests, the private-terms list,
+# and agent plans that quote real accounts. The public repo ships only the
+# fictional sample set (data/eval/sample-leftovers.v1.json).
+/data/eval/private/
+*.private.test.ts
+/.private-terms
+/.hermes/
+
 # vercel
 .vercel
 

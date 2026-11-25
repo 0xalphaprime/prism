@@ -43,7 +43,7 @@ describe("cardTranscript", () => {
       schemaVersion: 1,
       id: "exp-1",
       name: "test",
-      evalSetId: "prime-leftovers.v1",
+      evalSetId: "sample-leftovers.v1",
       architectureIds: ["eval-baseline"],
       reps: 1,
       profile: {},
@@ -57,14 +57,14 @@ describe("cardTranscript", () => {
       id: "card-1",
       split: "train",
       tags: [],
-      prompt: "Did we flip Oak Hill?",
-      allowedContext: "Do not declare Oak Hill flipped.",
+      prompt: "Did we flip Northgate?",
+      allowedContext: "Do not declare Northgate flipped.",
       goldFacts: [],
       forbiddenClaims: [],
       bits: [],
       failureTags: [],
     });
-    assert.match(text, /Did we flip Oak Hill\?/);
+    assert.match(text, /Did we flip Northgate\?/);
     assert.match(text, /Nemo first hop/);
     assert.match(text, /exhaust/);
     assert.match(text, /allowed context/);

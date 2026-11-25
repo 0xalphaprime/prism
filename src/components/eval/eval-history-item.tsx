@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
 import { EvalCardFlow } from "@/components/eval/eval-card-flow";
 import { experimentItemIds, focusExperiment } from "@/lib/eval/focus";
+import { rememberEvalSets } from "@/lib/eval/sets";
 import type { EvalItem, EvalSet, ExperimentRecord } from "@/lib/eval/types";
 
 export function EvalHistoryItem({
@@ -37,6 +38,9 @@ export function EvalHistoryItem({
           throw new Error(expBody.error || "Experiment not found");
         }
         if (!cancelled) {
+          // Private sets are not bundled; register them before the card flow
+          // computes decision notes from item tags and splits.
+          rememberEvalSets(setBody.sets ?? []);
           setExperiment(expBody.experiment);
           const set = setBody.sets?.find((s) => s.id === expBody.experiment?.evalSetId);
           setItems(set?.items ?? []);
